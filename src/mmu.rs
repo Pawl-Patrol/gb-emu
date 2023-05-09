@@ -1,10 +1,4 @@
-use crate::{
-    cartridge::{load_rom, load_state, save_state, Cartridge},
-    gpu::GPU,
-    joypad::JoyPad,
-    rtc::RTC,
-    traits::Memory,
-};
+use crate::{cartridge::Cartridge, gpu::GPU, joypad::JoyPad, rtc::RTC, traits::Memory};
 
 pub struct MMU {
     pub cartrige: Option<Box<dyn Cartridge>>,
@@ -67,22 +61,6 @@ impl MMU {
             io_backup,
             dma: 0xFF,
         }
-    }
-
-    pub fn load_rom(&mut self, path: &str) {
-        self.cartrige = load_rom(path).ok();
-    }
-
-    pub fn save_state(&mut self, path: &str) {
-        save_state(self.cartrige.as_ref().unwrap(), path).unwrap_or_else(|e| {
-            panic!("Failed to save state: {}", e);
-        });
-    }
-
-    pub fn load_state(&mut self, path: &str) {
-        load_state(self.cartrige.as_mut().unwrap(), path).unwrap_or_else(|e| {
-            panic!("Failed to load state: {}", e);
-        });
     }
 
     pub fn dma_transfer(&mut self, data: u8) {

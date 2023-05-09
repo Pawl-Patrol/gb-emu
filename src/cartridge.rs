@@ -1,11 +1,12 @@
-use std::io::{Read, Result, Seek};
+use crate::traits::{Memory, TestBit};
+use std::fs::{create_dir_all, read, write, File};
+use std::io::{Read, Result, Seek, SeekFrom};
+use std::path::Path;
 
 pub trait Cartridge: Memory {
     fn serialize(&self) -> Vec<u8>;
     fn deserialize(&mut self, data: Vec<u8>);
 }
-
-use crate::traits::{Memory, TestBit};
 
 const REGISTER_CARTRIDGE_TYPE: usize = 0x0147;
 const REGISTER_ROM_SIZE: usize = 0x0148;
@@ -14,8 +15,8 @@ const ROM_BANK_SIZE: usize = 0x4000;
 const RAM_BANK_SIZE: usize = 0x2000;
 
 pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
-    let mut file = std::fs::File::open(path)?;
-    file.seek(std::io::SeekFrom::Start(REGISTER_CARTRIDGE_TYPE as u64))?;
+    let mut file = File::open(path)?;
+    file.seek(SeekFrom::Start(REGISTER_CARTRIDGE_TYPE as u64))?;
     let mut buffer = [0_u8; 1];
     file.read_exact(&mut buffer)?;
     println!("Cartridge type: {:#04X}", buffer[0]);
@@ -29,14 +30,19 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
     }
 }
 
-pub fn save_state(cartridge: &Box<dyn Cartridge>, path: &str) -> std::io::Result<()> {
+pub fn save_state(cartridge: &Box<dyn Cartridge>, path: &str) -> Result<()> {
+    let path = Path::new(path);
+    let folder = path.parent().unwrap();
+    if !folder.exists() {
+        create_dir_all(folder)?;
+    }
     let data = cartridge.serialize();
-    std::fs::write(path, data)?;
+    write(path, data)?;
     Ok(())
 }
 
-pub fn load_state(cartridge: &mut Box<dyn Cartridge>, path: &str) -> std::io::Result<()> {
-    let data = std::fs::read(path)?;
+pub fn load_state(cartridge: &mut Box<dyn Cartridge>, path: &str) -> Result<()> {
+    let data = read(path)?;
     cartridge.deserialize(data);
     Ok(())
 }
@@ -74,7 +80,7 @@ struct NoMBC {
 
 impl NoMBC {
     fn load(path: &str) -> Self {
-        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom: Vec<u8> = read(path).unwrap();
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
         let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
@@ -122,7 +128,7 @@ struct MBC1 {
 
 impl MBC1 {
     fn load(path: &str) -> Self {
-        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom: Vec<u8> = read(path).unwrap();
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
         let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
@@ -201,7 +207,7 @@ struct MBC2 {
 
 impl MBC2 {
     fn load(path: &str) -> Self {
-        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom: Vec<u8> = read(path).unwrap();
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
         MBC2 {
@@ -271,7 +277,7 @@ struct MBC3 {
 
 impl MBC3 {
     fn load(path: &str) -> Self {
-        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom: Vec<u8> = read(path).unwrap();
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
         let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
@@ -380,7 +386,7 @@ struct MBC5 {
 
 impl MBC5 {
     fn load(path: &str) -> Self {
-        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom: Vec<u8> = read(path).unwrap();
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
         let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
@@ -432,7 +438,6 @@ impl Memory for MBC5 {
                 if self.enable_ram {
                     let bank = self.ram_bank * RAM_BANK_SIZE;
                     self.ram[bank + address - 0xA000] = data;
-                    println!("Wrote ram {:02X} = {:04X}", data, address)
                 }
             }
             _ => {}

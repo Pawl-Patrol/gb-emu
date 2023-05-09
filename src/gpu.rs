@@ -100,7 +100,7 @@ impl Memory for GPU {
             0xFF49 => self.obj_palette_1 = value,
             0xFF4A => self.window_y = value,
             0xFF4B => self.window_x = value,
-            _ => (), // println!("Invalid gpu address: 0x{:04X} = {:02X}", address, value),
+            _ => (),
         }
     }
 }
