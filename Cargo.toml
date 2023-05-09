@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 json = "0.12.4"
 minifb = "0.24"
+mini_gl_fb = "0.9.0"
