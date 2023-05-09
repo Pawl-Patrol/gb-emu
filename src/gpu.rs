@@ -69,10 +69,7 @@ impl Cartridge for GPU {
             0xFF49 => self.obj_palette_1,
             0xFF4A => self.window_y,
             0xFF4B => self.window_x,
-            _ => {
-                // println!("Invalid gpu address: 0x{:X}", address);
-                0x00
-            }
+            _ => 0x00,
         }
     }
 

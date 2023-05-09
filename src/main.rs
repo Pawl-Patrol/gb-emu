@@ -71,13 +71,6 @@ fn run_rom(path: &str) {
         fb.update_buffer(&cpu.mmu.gpu.video_buffer);
         let t4 = std::time::Instant::now();
 
-        println!(
-            "joypad: {:?}, cpu: {:?}, window: {:?}",
-            t2.duration_since(t1),
-            t3.duration_since(t2),
-            t4.duration_since(t3)
-        );
-
         true
     })
 }

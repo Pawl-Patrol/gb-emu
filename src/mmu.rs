@@ -105,10 +105,7 @@ impl MMU {
             // IE
             0xFFFF => self.interrupt_enable,
             // backup
-            0xFF00..=0xFF7F => {
-                // println!("read: {:04X}", address);
-                self.io_backup[(address - 0xFF00) as usize]
-            }
+            0xFF00..=0xFF7F => self.io_backup[(address - 0xFF00) as usize],
         }
     }
 
@@ -144,10 +141,7 @@ impl MMU {
             // IE
             0xFFFF => self.interrupt_enable = value,
             // backup
-            0xFF00..=0xFF7F => {
-                // println!("write: {:04X} = {:02X}", address, value);
-                self.io_backup[(address - 0xFF00) as usize] = value;
-            }
+            0xFF00..=0xFF7F => self.io_backup[(address - 0xFF00) as usize] = value,
         }
     }
 }
