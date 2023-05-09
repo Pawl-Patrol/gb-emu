@@ -1,18 +1,27 @@
 mod canvas;
 mod cartridge;
-mod clock;
 mod constants;
+mod context;
 mod cpu;
-mod emulator;
-mod graphics;
-mod input;
-mod interrupts;
+mod gpu;
+mod joypad;
 mod mmu;
-mod opcodes;
+mod rtc;
 mod traits;
 
-use emulator::Emulator;
+use std::{
+    borrow::BorrowMut,
+    cell::{Cell, RefCell, RefMut},
+    rc::Rc,
+};
+
+use context::Context;
+use cpu::CPU;
+use gpu::GPU;
+use joypad::JoyPad;
 use minifb::Window;
+use mmu::MMU;
+use rtc::RTC;
 
 fn run_rom(path: &str) {
     let mut window = Window::new(
@@ -24,8 +33,20 @@ fn run_rom(path: &str) {
     .unwrap();
     window.limit_update_rate(Some(std::time::Duration::from_secs_f32(1.0 / 60.0)));
 
-    let mut emulator = Emulator::new();
-    emulator.load_rom(path);
+    let mut cpu = Rc::new(Cell::new(CPU::new()));
+    let mut mmu = Rc::new(Cell::new(MMU::new()));
+    let mut rtc = Rc::new(Cell::new(RTC::new()));
+    let mut gpu = Rc::new(Cell::new(GPU::new()));
+    let mut joypad = Rc::new(Cell::new(JoyPad::new()));
+    let mut ctx = Context {
+        cpu,
+        mmu,
+        rtc,
+        gpu,
+        joypad,
+    };
+    // call mmu.load_rom(path) on ctx
+    ctx.mmu.get_mut().load_rom(path);
 
     let key_mapping = vec![
         (minifb::Key::Up, constants::KEY_UP),
@@ -49,21 +70,25 @@ fn run_rom(path: &str) {
         }
         for (from, to) in &key_mapping {
             if window.is_key_down(*from) {
-                emulator.on_key_pressed(*to);
+                ctx.joypad.get_mut().on_key_pressed(&mut ctx, *to);
             } else if window.is_key_released(*from) {
-                emulator.on_key_released(*to);
+                ctx.joypad.get_mut().on_key_released(*to);
             }
         }
 
         let ticks = elapsed * 4194304 / 1000000;
         let mut cycles = 0;
         while cycles < ticks {
-            cycles += emulator.update() as u128;
+            let c = ctx.cpu.get_mut().execute_next_opcode(&mut ctx);
+            ctx.rtc.get_mut().update_timers(&mut ctx, c);
+            ctx.gpu.get_mut().update_graphics(&mut ctx, c);
+            ctx.cpu.get_mut().do_interrupts(&mut ctx);
+            cycles += c as u128;
         }
 
         window
             .update_with_buffer(
-                &emulator.video_buffer,
+                &ctx.gpu.video_buffer,
                 constants::SCREEN_WIDTH,
                 constants::SCREEN_HEIGHT,
             )
