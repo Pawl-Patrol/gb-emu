@@ -452,7 +452,7 @@ impl Emulator {
 
     pub fn read_memory(&self, address: u16) -> u8 {
         if (address < 0x8000) || (address >= 0xA000 && address < 0xC000) {
-            return self.cartrige.as_ref().unwrap().read(address);
+            return self.cartrige.as_ref().unwrap().read(address as usize);
         } else if address >= 0xE000 && address < 0xFE00 {
             // echo ram
             return self.read_memory(address - 0x2000);
@@ -469,7 +469,11 @@ impl Emulator {
 
     pub fn write_memory(&mut self, address: u16, data: u8) {
         if (address < 0x8000) || (address >= 0xA000 && address < 0xC000) {
-            return self.cartrige.as_mut().unwrap().write(address, data);
+            return self
+                .cartrige
+                .as_mut()
+                .unwrap()
+                .write(address as usize, data);
         } else if address >= 0xFEA0 && address < 0xFEFF {
             return; // prohibited
         } else if address >= 0xE000 && address < 0xFE00 {
