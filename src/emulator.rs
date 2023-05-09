@@ -52,14 +52,10 @@ impl Emulator {
     }
 
     pub fn update(&mut self) {
-        let mut cycles_total: u32 = 0;
-        while cycles_total < CYCLES_PER_FRAME {
-            let cycles = self.execute_next_opcode();
-            cycles_total += cycles as u32;
-            self.update_timers(cycles);
-            self.update_graphics(cycles);
-            self.do_interrupts();
-        }
+        let cycles = self.execute_next_opcode();
+        self.update_timers(cycles);
+        self.update_graphics(cycles);
+        self.do_interrupts();
     }
 
     pub fn log(&self, log: &str) {

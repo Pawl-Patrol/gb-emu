@@ -36,7 +36,11 @@ fn run_rom(path: &str) {
 
     window.limit_update_rate(Some(std::time::Duration::from_secs_f32(1.0 / 60.0)));
     // keyboard event
-    call_fps(60.0, &mut || {
+    let mut last_frame = std::time::Instant::now();
+    loop {
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(last_frame).as_secs_f32();
+
         if window.is_key_down(minifb::Key::Escape) {
             std::process::exit(0);
         }
@@ -89,7 +93,9 @@ fn run_rom(path: &str) {
         if window.is_key_released(minifb::Key::Space) {
             emulator.on_key_released(constants::KEY_SELECT);
         }
-        emulator.update();
+        for _ in 0..69905 {
+            emulator.update();
+        }
         window
             .update_with_buffer(
                 &emulator.video_buffer,
@@ -97,7 +103,7 @@ fn run_rom(path: &str) {
                 constants::SCREEN_HEIGHT,
             )
             .unwrap();
-    });
+    }
 }
 
 fn run_test_rom(path: &str) {
@@ -111,5 +117,5 @@ fn run_test_rom(path: &str) {
 }
 
 fn main() {
-    run_rom("./roms/mario.gb");
+    run_rom("./roms/pokemon.gb");
 }

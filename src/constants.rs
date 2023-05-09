@@ -1,6 +1,5 @@
 pub const CPU_FREQ_IN_HZ: u32 = 4194304;
 pub const FRAME_RATE: u32 = 60;
-pub const CYCLES_PER_FRAME: u32 = 69905;
 
 // timer
 pub const TIMER_FREQ_0: u32 = 1024;
