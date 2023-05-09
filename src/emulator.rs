@@ -13,6 +13,7 @@ pub struct Emulator {
     cpu: CPU,
     rom_path: String,
     ram_path: String,
+    speed: u128,
 }
 
 impl Emulator {
@@ -21,6 +22,7 @@ impl Emulator {
             cpu: CPU::new(),
             rom_path: rom_path.to_string(),
             ram_path: ram_path.to_string(),
+            speed: 100,
         }
     }
 
@@ -53,6 +55,7 @@ impl Emulator {
         ];
 
         let mut previous = std::time::Instant::now();
+        let mut last_speed_change = std::time::Instant::now();
 
         window.glutin_handle_basic_input(&mut event_loop, |fb, input| {
             let now = std::time::Instant::now();
@@ -67,6 +70,18 @@ impl Emulator {
             } else if input.key_pressed(Key::L) {
                 self.load_save()
                     .unwrap_or_else(|e| println!("Failed to load state: {}", e));
+            } else if input.key_is_down(Key::Comma) {
+                if self.speed < 1000 && now.duration_since(last_speed_change).as_millis() > 100 {
+                    self.speed += 10;
+                    last_speed_change = now;
+                    println!("Speed: {}%", self.speed)
+                }
+            } else if input.key_is_down(Key::Period) {
+                if self.speed > 10 && now.duration_since(last_speed_change).as_millis() > 100 {
+                    self.speed -= 10;
+                    last_speed_change = now;
+                    println!("Speed: {}%", self.speed)
+                }
             }
 
             for (from, to) in &key_mapping {
@@ -77,7 +92,7 @@ impl Emulator {
                 }
             }
 
-            let ticks = elapsed.as_micros() * 4194304 / 1000000;
+            let ticks = elapsed.as_micros() * 4194304 / 1000000 * self.speed / 100;
             let mut cycles = 0;
 
             while cycles < ticks {
