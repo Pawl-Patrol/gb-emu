@@ -1,8 +1,12 @@
 mod canvas;
 mod cartridge;
+mod clock;
 mod constants;
 mod cpu;
 mod emulator;
+mod graphics;
+mod input;
+mod interrupts;
 mod mmu;
 mod opcodes;
 mod traits;
