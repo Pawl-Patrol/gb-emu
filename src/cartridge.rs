@@ -18,6 +18,8 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
         0x00 | 0x08 | 0x09 => Ok(Box::new(NoMBC::load(path))),
         0x01 | 0x02 | 0x03 => Ok(Box::new(MBC1::load(path))),
         0x05 | 0x06 => Ok(Box::new(MBC2::load(path))),
+        0x0F | 0x10 | 0x11 | 0x12 | 0x13 => Ok(Box::new(MBC3::load(path))),
+        0x19 | 0x1A | 0x1B | 0x1C | 0x1D | 0x1E => Ok(Box::new(MBC5::load(path))),
         _ => panic!("Unsupported cartridge type!"),
     }
 }
@@ -289,6 +291,66 @@ impl Cartridge for MBC3 {
                 }
             }
             0x6000..=0x7FFF => {} // Todo: Latch RTC
+            _ => {}
+        }
+    }
+}
+
+struct MBC5 {
+    rom: Vec<u8>,
+    ram: Vec<u8>,
+    // registers
+    enable_ram: bool,
+    ram_bank: usize,
+    rom_bank: usize,
+}
+
+impl MBC5 {
+    fn load(path: &str) -> Self {
+        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
+        assert!(rom.len() == rom_size);
+        let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
+        let ram = vec![0; ram_size];
+        MBC5 {
+            rom,
+            ram,
+            enable_ram: false,
+            ram_bank: 0,
+            rom_bank: 1,
+        }
+    }
+}
+
+impl Cartridge for MBC5 {
+    fn read(&self, address: usize) -> u8 {
+        match address {
+            0x0000..=0x3FFF => self.rom[address],
+            0x4000..=0x7FFF => {
+                let bank = self.rom_bank * ROM_BANK_SIZE;
+                self.rom[bank + address - 0x4000]
+            }
+            0xA000..=0xBFFF => {
+                let bank = self.ram_bank * RAM_BANK_SIZE;
+                self.ram[bank + address - 0xA000]
+            }
+            _ => panic!("Invalid address read!"),
+        }
+    }
+
+    fn write(&mut self, address: usize, data: u8) {
+        match address {
+            0x0000..=0x1FFF => self.enable_ram = data & 0x0F == 0x0A,
+            0x2000..=0x2FFF => {
+                self.rom_bank = (self.rom_bank & 0b0001_0000_0000) | data as usize;
+            }
+            0x3000..=0x3FFF => {
+                self.rom_bank =
+                    (self.rom_bank & 0b0000_1111_1111) | ((data as usize & 0b0000_0001) << 8);
+            }
+            0x4000..=0x5FFF => {
+                self.ram_bank = data as usize & 0x0F;
+            }
             _ => {}
         }
     }
