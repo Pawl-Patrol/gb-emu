@@ -219,7 +219,7 @@ struct MBC3 {
     rom: Vec<u8>,
     ram: Vec<u8>,
     // registers
-    ram_and_timer_enabled: bool,
+    ram_enabled: bool,
     ram_banking_mode: bool,
     ram_bank: usize,
     rom_bank: usize,
@@ -237,7 +237,7 @@ impl MBC3 {
         MBC3 {
             rom,
             ram,
-            ram_and_timer_enabled: false,
+            ram_enabled: false,
             ram_banking_mode: false,
             ram_bank: 0,
             rom_bank: 1,
@@ -257,8 +257,12 @@ impl Cartridge for MBC3 {
             }
             0xA000..=0xBFFF => {
                 if self.ram_banking_mode {
-                    let bank = self.ram_bank * RAM_BANK_SIZE;
-                    self.ram[bank + address - 0xA000]
+                    if self.ram_enabled {
+                        let bank = self.ram_bank * RAM_BANK_SIZE;
+                        self.ram[bank + address - 0xA000]
+                    } else {
+                        0xFF
+                    }
                 } else {
                     match self.rtc_select {
                         0x08 => self.rtc[0],
@@ -276,7 +280,7 @@ impl Cartridge for MBC3 {
 
     fn write(&mut self, address: usize, data: u8) {
         match address {
-            0x0000..=0x1FFF => self.ram_and_timer_enabled = data & 0x0F == 0x0A,
+            0x0000..=0x1FFF => self.ram_enabled = data & 0x0F == 0x0A,
             0x2000..=0x3FFF => {
                 let data = if data == 0 { 1 } else { data };
                 self.rom_bank = data as usize & 0b0111_1111;
@@ -291,6 +295,23 @@ impl Cartridge for MBC3 {
                 }
             }
             0x6000..=0x7FFF => {} // Todo: Latch RTC
+            0xA000..=0xBFFF => {
+                if self.ram_banking_mode {
+                    if self.ram_enabled {
+                        let bank = self.ram_bank * RAM_BANK_SIZE;
+                        self.ram[bank + address - 0xA000] = data;
+                    }
+                } else {
+                    match self.rtc_select {
+                        0x08 => self.rtc[0] = data,
+                        0x09 => self.rtc[1] = data,
+                        0x0A => self.rtc[2] = data,
+                        0x0B => self.rtc[3] = data,
+                        0x0C => self.rtc[4] = data,
+                        _ => panic!("Invalid RTC select!"),
+                    }
+                }
+            }
             _ => {}
         }
     }
