@@ -13,4 +13,3 @@
 - Savegames
 - Sound
 - CLI
-- Separate MMU components
