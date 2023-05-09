@@ -1,6 +1,6 @@
 # Gameboy emulator written in rust
 
-# Tested games:
+# Tested roms
 
 - Blargg's instruction test ROMs (except timing)
 - Tetris
@@ -8,9 +8,9 @@
 - Pokemon Blue
 - Pokemon Yellow
 
-# Todo:
+# Todo
 
 - Savegames
 - Sound
 - CLI
-- Emulate MMU components
+- Separate MMU components
