@@ -121,5 +121,5 @@ fn run_test_rom(path: &str) {
 }
 
 fn main() {
-    run_rom("./roms/pokemon.gb");
+    run_rom("./roms/pikachu.gb");
 }

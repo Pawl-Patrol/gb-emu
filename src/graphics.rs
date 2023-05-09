@@ -147,8 +147,8 @@ impl Emulator {
                 let tile_num = self.read_memory(tile_address) as u16;
                 tile_data + tile_num * 16
             } else {
-                let tile_num = self.read_memory(tile_address) as i8 as i16;
-                tile_data.wrapping_add_signed((tile_num + 128) * 16)
+                let tile_num = self.read_memory(tile_address);
+                tile_data + ((tile_num as i8 as i16 + 128) * 16) as u16
             };
 
             let line = ((y_pos % 8) * 2) as u16;
@@ -189,47 +189,47 @@ impl Emulator {
             let scanline = self.read_memory(0xFF44);
             let y_size = if using_8x16 { 16 } else { 8 };
 
-            if scanline >= y_pos && scanline < y_pos + y_size {
-                let mut line = (scanline - y_pos) as i32;
-                if y_flip {
-                    line -= y_size as i32;
-                    line *= -1;
+            if scanline < y_pos || scanline >= y_pos + y_size {
+                continue;
+            }
+
+            let mut line = scanline - y_pos;
+            if y_flip {
+                line = y_size - line;
+            }
+
+            line *= 2;
+
+            let address = 0x8000 + (tile_location as u16 * 16) + line as u16;
+
+            let data1 = self.read_memory(address);
+            let data2 = self.read_memory(address + 1);
+
+            for tile_pixel in (0_u8..8_u8).rev() {
+                let mut color_bit = tile_pixel;
+                if x_flip {
+                    color_bit = 7 - color_bit;
+                }
+                let color_num =
+                    ((data2.test_bit(color_bit) as u8) << 1) | (data1.test_bit(color_bit) as u8);
+                let color_address = if attributes.test_bit(4) {
+                    0xFF49
+                } else {
+                    0xFF48
+                };
+                let mut color = self.get_color(color_num, color_address);
+
+                if color == COLOR_WHITE {
+                    continue;
                 }
 
-                line *= 2;
+                let pixel = x_pos.wrapping_add(7 - tile_pixel);
 
-                let address = 0x8000 + (tile_location as u16 * 16) + line as u16;
-
-                let data1 = self.read_memory(address);
-                let data2 = self.read_memory(address + 1);
-
-                for tile_pixel in (0_u8..8_u8).rev() {
-                    let mut color_bit = tile_pixel;
-                    if x_flip {
-                        color_bit = ((tile_pixel as i8 - 7) * -1) as u8;
-                    }
-                    let color_num = ((data2.test_bit(color_bit) as u8) << 1)
-                        | (data1.test_bit(color_bit) as u8);
-                    let color_address = if attributes.test_bit(4) {
-                        0xFF49
-                    } else {
-                        0xFF48
-                    };
-                    let color = self.get_color(color_num, color_address);
-
-                    if color == COLOR_WHITE {
-                        continue;
-                    }
-
-                    let final_y = self.read_memory(0xFF44);
-                    let pixel = x_pos.wrapping_add(7 - tile_pixel);
-
-                    if final_y > 143 || pixel > 159 {
-                        continue;
-                    }
-
-                    self.video_buffer[final_y as usize * SCREEN_WIDTH + pixel as usize] = color;
+                if scanline > 143 || pixel > 159 {
+                    continue;
                 }
+
+                self.video_buffer[scanline as usize * SCREEN_WIDTH + pixel as usize] = color;
             }
         }
     }
