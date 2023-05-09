@@ -1,19 +1,6 @@
-pub const CPU_FREQ_IN_HZ: u32 = 4194304;
-pub const FRAME_RATE: u32 = 60;
-
-// timer
-pub const TIMER_FREQ_0: u32 = 1024;
-pub const TIMER_FREQ_1: u32 = 16;
-pub const TIMER_FREQ_2: u32 = 64;
-pub const TIMER_FREQ_3: u32 = 256;
-
 // screen size
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
-
-// bank sizes
-pub const ROM_BANK_SIZE: usize = 0x4000;
-pub const RAM_BANK_SIZE: usize = 0x2000;
 
 // special addresses
 pub const TIMA: u16 = 0xFF05;

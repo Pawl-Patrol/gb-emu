@@ -91,6 +91,7 @@ impl Emulator {
 
     fn draw_scanline(&mut self) {
         let control = self.read_memory(LCD_CONTROL);
+
         if control.test_bit(0) {
             self.render_tiles()
         }
@@ -107,8 +108,7 @@ impl Emulator {
         let window_y = self.read_memory(0xFF4A);
         let window_x = self.read_memory(0xFF4B).wrapping_sub(7);
 
-        let using_window =
-            self.read_memory(0xFF40).test_bit(5) && window_y <= self.read_memory(0xFF44);
+        let using_window = control.test_bit(5) && (window_y <= self.read_memory(0xFF44));
         let unsigned = control.test_bit(4);
         let tile_data: u16 = if unsigned { 0x8000 } else { 0x8800 };
 
@@ -137,27 +137,27 @@ impl Emulator {
         for pixel in 0_u8..160_u8 {
             let mut x_pos = pixel.wrapping_add(scroll_x);
 
-            if using_window && pixel >= window_x {
+            if using_window && (pixel >= window_x) {
                 x_pos = pixel - window_x;
             }
 
-            let tile_col = (x_pos / 8) as u16;
-            let tile_address = background_mem + tile_row + tile_col;
+            let tile_address = background_mem + tile_row + (x_pos / 8) as u16;
+
             let tile_location = if unsigned {
-                let tile_num = self.read_memory(tile_address) as u16;
-                tile_data + tile_num * 16
+                let tile_num = self.read_memory(tile_address);
+                tile_data + (tile_num as u16 * 16)
             } else {
                 let tile_num = self.read_memory(tile_address);
-                tile_data + ((tile_num as i8 as i16 + 128) * 16) as u16
+                tile_data + ((tile_num as i8 as i16 + 128) as u16 * 16)
             };
 
             let line = ((y_pos % 8) * 2) as u16;
             let data1 = self.read_memory(tile_location + line);
             let data2 = self.read_memory(tile_location + line + 1);
 
-            let color_bit = ((x_pos % 8) as i16 - 7) * -1;
-            let color_num = ((data2.test_bit(color_bit as u8) as u8) << 1)
-                | (data1.test_bit(color_bit as u8) as u8);
+            let color_bit = 7 - (x_pos % 8);
+            let color_num =
+                ((data2.test_bit(color_bit) as u8) << 1) | (data1.test_bit(color_bit) as u8);
             let color = self.get_color(color_num, 0xFF47);
 
             let final_y = self.read_memory(0xFF44);
@@ -175,7 +175,7 @@ impl Emulator {
         let using_8x16 = control.test_bit(2);
 
         for sprite in 0..40 {
-            let index: u16 = sprite * 4;
+            let index = sprite * 4;
 
             let y_pos = self.read_memory(0xFE00 + index).wrapping_sub(16);
             let x_pos = self.read_memory(0xFE00 + index + 1).wrapping_sub(8);
@@ -189,11 +189,12 @@ impl Emulator {
             let scanline = self.read_memory(0xFF44);
             let y_size = if using_8x16 { 16 } else { 8 };
 
-            if scanline < y_pos || scanline >= y_pos + y_size {
+            if (scanline < y_pos) || (scanline >= y_pos + y_size) {
                 continue;
             }
 
             let mut line = scanline - y_pos;
+
             if y_flip {
                 line = y_size - line;
             }
@@ -217,19 +218,25 @@ impl Emulator {
                 } else {
                     0xFF48
                 };
-                let mut color = self.get_color(color_num, color_address);
+                let color = self.get_color(color_num, color_address);
 
                 if color == COLOR_WHITE {
                     continue;
                 }
 
-                let pixel = x_pos.wrapping_add(7 - tile_pixel);
+                let pixel = x_pos.wrapping_add(7).wrapping_sub(tile_pixel);
 
                 if scanline > 143 || pixel > 159 {
                     continue;
                 }
 
-                self.video_buffer[scanline as usize * SCREEN_WIDTH + pixel as usize] = color;
+                let video_buffer_index = scanline as usize * SCREEN_WIDTH + pixel as usize;
+
+                if attributes.test_bit(7) && self.video_buffer[video_buffer_index] != COLOR_WHITE {
+                    continue;
+                }
+
+                self.video_buffer[video_buffer_index] = color;
             }
         }
     }

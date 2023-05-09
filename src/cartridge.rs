@@ -331,8 +331,12 @@ impl Cartridge for MBC5 {
                 self.rom[bank + address - 0x4000]
             }
             0xA000..=0xBFFF => {
-                let bank = self.ram_bank * RAM_BANK_SIZE;
-                self.ram[bank + address - 0xA000]
+                if self.enable_ram {
+                    let bank = self.ram_bank * RAM_BANK_SIZE;
+                    self.ram[bank + address - 0xA000]
+                } else {
+                    0xFF
+                }
             }
             _ => panic!("Invalid address read!"),
         }
@@ -350,6 +354,12 @@ impl Cartridge for MBC5 {
             }
             0x4000..=0x5FFF => {
                 self.ram_bank = data as usize & 0x0F;
+            }
+            0xA000..=0xBFFF => {
+                if self.enable_ram {
+                    let bank = self.ram_bank * RAM_BANK_SIZE;
+                    self.ram[bank + address - 0xA000] = data;
+                }
             }
             _ => {}
         }

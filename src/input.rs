@@ -1,4 +1,4 @@
-use crate::{canvas::*, constants::*, emulator::Emulator, traits::*};
+use crate::{emulator::Emulator, traits::*};
 
 impl Emulator {
     pub fn on_key_pressed(&mut self, key: u8) {

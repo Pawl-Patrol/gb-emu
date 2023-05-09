@@ -4,7 +4,6 @@ use crate::{
     traits::{CarryTest, Register, SetBit, TestBit, ToggleBit},
 };
 
-// macro for loading 8-bit values into registers
 macro_rules! cpu_8bit_load {
     ($emulator: ident, $register:ident) => {{
         $emulator.cpu.$register = $emulator.read_byte();
@@ -1187,8 +1186,6 @@ impl Emulator {
             0xFD => set_bit!(self, self.cpu.l, 7),
             0xFE => set_bit_memory!(self, u16::from_bytes(self.cpu.h, self.cpu.l), 7),
             0xFF => set_bit!(self, self.cpu.a, 7),
-
-            _ => panic!("Unknown extended opcode: {:02X}", opcode),
         }
     }
 

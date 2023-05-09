@@ -1,4 +1,4 @@
-use crate::{canvas::*, constants::*, emulator::Emulator, traits::*};
+use crate::{constants::*, emulator::Emulator, traits::*};
 
 impl Emulator {
     pub fn do_interrupts(&mut self) {

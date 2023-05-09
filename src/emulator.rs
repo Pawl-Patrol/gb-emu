@@ -1,20 +1,13 @@
-use std::io::Write;
-
-use crate::canvas::{COLOR_BLACK, COLOR_DARK_GRAY, COLOR_LIGHT_GRAY, COLOR_WHITE};
 use crate::cartridge::{load_rom, Cartridge};
 use crate::constants::*;
 use crate::cpu::CPU;
 use crate::mmu::MMU;
-use crate::traits::{Register, SetBit, TestBit};
+use crate::traits::Register;
 
 pub struct Emulator {
     pub cpu: CPU,
     pub mmu: MMU,
     pub cartrige: Option<Box<dyn Cartridge>>,
-    pub current_rom_bank: usize,
-    pub current_ram_bank: usize,
-    pub rom_banking: bool,
-    pub enable_ram: bool,
     pub timer_counter: u32,
     pub divider_counter: u16,
     pub interrupts_enabled: bool,
@@ -31,10 +24,6 @@ impl Emulator {
             cpu: CPU::new(),
             mmu: MMU::new(),
             cartrige: None,
-            current_rom_bank: 1,
-            current_ram_bank: 0,
-            enable_ram: false,
-            rom_banking: false,
             timer_counter: 0,
             divider_counter: 0,
             interrupts_enabled: false,
@@ -50,11 +39,12 @@ impl Emulator {
         self.cartrige = load_rom(path).ok();
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> u16 {
         let cycles = self.execute_next_opcode();
         self.update_timers(cycles);
         self.update_graphics(cycles);
         self.do_interrupts();
+        cycles
     }
 
     pub fn execute_next_opcode(&mut self) -> u16 {

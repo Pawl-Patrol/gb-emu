@@ -1,6 +1,3 @@
-use crate::traits::Register;
-
-// memory management unit
 pub struct MMU {
     pub memory: [u8; 0x10000],
 }
@@ -8,6 +5,7 @@ pub struct MMU {
 impl MMU {
     pub fn new() -> MMU {
         let mut memory = [0; 0x10000];
+        // https://gbdev.io/pandocs/Power_Up_Sequence.html
         memory[0xFF05] = 0x00;
         memory[0xFF06] = 0x00;
         memory[0xFF07] = 0x00;
@@ -46,19 +44,7 @@ impl MMU {
         self.memory[address as usize]
     }
 
-    pub fn read_word(&self, address: u16) -> u16 {
-        u16::from_bytes(
-            self.memory[address as usize],
-            self.memory[address as usize + 1],
-        )
-    }
-
     pub fn write_byte(&mut self, address: u16, value: u8) {
         self.memory[address as usize] = value;
-    }
-
-    pub fn write_word(&mut self, address: u16, value: u16) {
-        self.memory[address as usize] = value.hi();
-        self.memory[address as usize + 1] = value.lo();
     }
 }
