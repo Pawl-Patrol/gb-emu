@@ -220,11 +220,7 @@ impl GPU {
         let tile_row = ((y_pos / 8) as u16) * 32;
 
         for pixel in 0_u8..160_u8 {
-            let mut x_pos = pixel.wrapping_add(self.scroll_x);
-
-            if using_window && (pixel >= self.window_x) {
-                x_pos = pixel - self.window_x;
-            }
+            let x_pos = pixel.wrapping_add(self.scroll_x);
 
             let tile_address = background_mem + tile_row + (x_pos / 8) as u16;
             let tile_num = self.read(tile_address as usize);
