@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::cartridge::Cartridge;
 use crate::constants::*;
 use crate::cpu::CPU;
@@ -16,7 +18,9 @@ pub struct Emulator {
     pub timer_counter: u32,
     pub divider_counter: u32,
     pub interrupts_enabled: bool,
+    pub pending_interrupt: Option<bool>,
     pub scanline_counter: u32,
+    pub halted: bool,
 }
 
 impl Emulator {
@@ -33,13 +37,23 @@ impl Emulator {
             timer_counter: 0,
             divider_counter: 0,
             interrupts_enabled: false,
+            pending_interrupt: None,
             scanline_counter: 0,
+            halted: false,
         }
     }
 
-    fn update(&mut self) {
+    pub fn load_rom(&mut self, path: &str) {
+        self.cartrige.load(path);
+
+        // load rom bank 0
+        self.mmu.memory[0..0x4000].copy_from_slice(&self.cartrige.rom[0..0x4000]);
+    }
+
+    pub fn update(&mut self) {
         let mut cycles_total: u32 = 0;
         while cycles_total < CYCLES_PER_FRAME {
+            self.log();
             let cycles = self.execute_next_opcode();
             cycles_total += cycles;
             self.update_timers(cycles);
@@ -48,10 +62,54 @@ impl Emulator {
         }
     }
 
+    pub fn log(&self) {
+        // write the current cpu state to the log file
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("log.txt")
+            .unwrap();
+        // E.g.: A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
+        let log = format!(
+            "A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
+            self.cpu.a,
+            self.cpu.f,
+            self.cpu.b,
+            self.cpu.c,
+            self.cpu.d,
+            self.cpu.e,
+            self.cpu.h,
+            self.cpu.l,
+            self.cpu.sp,
+            self.cpu.pc,
+            self.read_memory(self.cpu.pc),
+            self.read_memory(self.cpu.pc + 1),
+            self.read_memory(self.cpu.pc + 2),
+            self.read_memory(self.cpu.pc + 3),
+        );
+        file.write_all(log.as_bytes()).unwrap();
+    }
+
     fn execute_next_opcode(&mut self) -> u32 {
-        let opcode = self.read_memory(self.cpu.pc);
-        self.cpu.pc += 1;
-        return self.execute(opcode);
+        let cycles = if self.halted {
+            4
+        } else {
+            let opcode = self.read_memory(self.cpu.pc);
+            self.cpu.pc += 1;
+            let result = self.execute(opcode);
+            result
+        };
+
+        if self.pending_interrupt == Some(true) && self.read_memory(self.cpu.pc - 1) != 0xFB {
+            self.interrupts_enabled = true;
+            self.pending_interrupt = None;
+        } else if self.pending_interrupt == Some(false) && self.read_memory(self.cpu.pc - 1) != 0xF3
+        {
+            self.interrupts_enabled = false;
+            self.pending_interrupt = None;
+        }
+
+        cycles
     }
 
     fn update_timers(&mut self, cycles: u32) {
@@ -187,9 +245,7 @@ impl Emulator {
         self.read_memory(LCD_CONTROL).test_bit(7)
     }
 
-    fn draw_scanline(&self) {
-        todo!();
-    }
+    fn draw_scanline(&self) {}
 
     fn request_interrupt(&mut self, id: u8) {
         let mut request = self.read_memory(INTERRUPT_FLAG);
@@ -201,17 +257,17 @@ impl Emulator {
         if self.interrupts_enabled {
             let request = self.read_memory(INTERRUPT_FLAG);
             let enabled = self.read_memory(INTERRUPT_ENABLE);
-            if request > 0 {
-                for i in 0..5 {
-                    if request.test_bit(i) && enabled.test_bit(i) {
-                        self.service_interrupt(i);
-                    }
+            for i in 0..5 {
+                if request.test_bit(i) && enabled.test_bit(i) {
+                    self.service_interrupt(i);
                 }
             }
         }
     }
 
     fn service_interrupt(&mut self, id: u8) {
+        println!("Servicing interrupt {}", id);
+        self.halted = false;
         self.interrupts_enabled = false;
         let mut request = self.read_memory(INTERRUPT_FLAG);
         request.reset_bit(id);
@@ -229,8 +285,8 @@ impl Emulator {
     }
 
     pub fn push_stack(&mut self, data: u16) {
-        self.write_memory(self.cpu.sp - 1, (data >> 8) as u8);
-        self.write_memory(self.cpu.sp - 2, (data & 0xFF) as u8);
+        self.write_memory(self.cpu.sp - 1, data.hi());
+        self.write_memory(self.cpu.sp - 2, data.lo());
         self.cpu.sp -= 2;
     }
 
@@ -238,10 +294,14 @@ impl Emulator {
         let lo = self.read_memory(self.cpu.sp);
         let hi = self.read_memory(self.cpu.sp + 1);
         self.cpu.sp += 2;
-        return u16::from_bytes(hi, lo);
+        u16::from_bytes(hi, lo)
     }
 
     pub fn read_memory(&self, address: u16) -> u8 {
+        // harcode SCANLINE register to return 0x90
+        if address == 0xFF44 {
+            return 0x90;
+        }
         if address >= 0x4000 && address <= 0x7FFF {
             // rom memory bank
             let rom_address = address as usize - 0x4000;
@@ -261,7 +321,7 @@ impl Emulator {
         if address < 0x8000 {
             self.handle_banking(address, data);
         } else if address >= 0xA000 && address < 0xC000 {
-            if (self.enable_ram) {
+            if self.enable_ram {
                 let ram_address = address as usize - 0xA000;
                 let bank_offset = self.current_ram_bank * RAM_BANK_SIZE;
                 self.cartrige.ram[ram_address + bank_offset] = data;
@@ -290,6 +350,9 @@ impl Emulator {
         } else if address == DMA {
             self.dma_transfer(data);
             return;
+        } else if address == 0xFF01 {
+            // print serial output
+            print!("{}", data as char);
         }
         // write memory
         self.mmu.write_byte(address, data);

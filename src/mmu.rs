@@ -2,7 +2,7 @@ use crate::traits::Register;
 
 // memory management unit
 pub struct MMU {
-    memory: [u8; 0x10000],
+    pub memory: [u8; 0x10000],
 }
 
 impl MMU {

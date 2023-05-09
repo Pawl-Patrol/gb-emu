@@ -72,3 +72,14 @@ impl ToggleBit for u8 {
         }
     }
 }
+
+pub trait CarryTest {
+    fn test_add_carry_bit(&self, value: Self, bit: u8) -> bool;
+}
+
+impl CarryTest for u16 {
+    fn test_add_carry_bit(&self, value: u16, bit: u8) -> bool {
+        let mask = (1_u16 << (bit + 1)) - 1_u16;
+        (self & mask) + (value & mask) > mask
+    }
+}
