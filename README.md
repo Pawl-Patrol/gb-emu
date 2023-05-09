@@ -10,6 +10,5 @@
 
 # Todo
 
-- Savegames
 - Sound
 - CLI

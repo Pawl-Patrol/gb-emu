@@ -1,4 +1,4 @@
-pub trait Cartridge {
+pub trait Memory {
     fn read(&self, address: usize) -> u8;
     fn write(&mut self, address: usize, data: u8);
 }

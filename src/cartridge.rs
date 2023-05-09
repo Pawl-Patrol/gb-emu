@@ -1,6 +1,11 @@
 use std::io::{Read, Result, Seek};
 
-use crate::traits::{Cartridge, TestBit};
+pub trait Cartridge: Memory {
+    fn serialize(&self) -> Vec<u8>;
+    fn deserialize(&mut self, data: Vec<u8>);
+}
+
+use crate::traits::{Memory, TestBit};
 
 const REGISTER_CARTRIDGE_TYPE: usize = 0x0147;
 const REGISTER_ROM_SIZE: usize = 0x0148;
@@ -13,7 +18,7 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
     file.seek(std::io::SeekFrom::Start(REGISTER_CARTRIDGE_TYPE as u64))?;
     let mut buffer = [0_u8; 1];
     file.read_exact(&mut buffer)?;
-    // println!("Cartridge type: {:#04X}", buffer[0]);
+    println!("Cartridge type: {:#04X}", buffer[0]);
     match buffer[0] {
         0x00 | 0x08 | 0x09 => Ok(Box::new(NoMBC::load(path))),
         0x01 | 0x02 | 0x03 => Ok(Box::new(MBC1::load(path))),
@@ -22,6 +27,18 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
         0x19 | 0x1A | 0x1B | 0x1C | 0x1D | 0x1E => Ok(Box::new(MBC5::load(path))),
         _ => panic!("Unsupported cartridge type!"),
     }
+}
+
+pub fn save_state(cartridge: &Box<dyn Cartridge>, path: &str) -> std::io::Result<()> {
+    let data = cartridge.serialize();
+    std::fs::write(path, data)?;
+    Ok(())
+}
+
+pub fn load_state(cartridge: &mut Box<dyn Cartridge>, path: &str) -> std::io::Result<()> {
+    let data = std::fs::read(path)?;
+    cartridge.deserialize(data);
+    Ok(())
 }
 
 fn get_rom_size(value: u8) -> usize {
@@ -66,7 +83,7 @@ impl NoMBC {
     }
 }
 
-impl Cartridge for NoMBC {
+impl Memory for NoMBC {
     fn read(&self, address: usize) -> u8 {
         match address {
             0x0000..=0x7FFF => self.rom[address],
@@ -80,6 +97,16 @@ impl Cartridge for NoMBC {
             0xA000..=0xBFFF => self.ram[address - 0xA000] = data,
             _ => {}
         }
+    }
+}
+
+impl Cartridge for NoMBC {
+    fn deserialize(&mut self, data: Vec<u8>) {
+        self.ram = data;
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.ram.clone()
     }
 }
 
@@ -111,7 +138,7 @@ impl MBC1 {
     }
 }
 
-impl Cartridge for MBC1 {
+impl Memory for MBC1 {
     fn read(&self, address: usize) -> u8 {
         match address {
             0x0000..=0x3FFF => self.rom[address],
@@ -154,6 +181,16 @@ impl Cartridge for MBC1 {
     }
 }
 
+impl Cartridge for MBC1 {
+    fn deserialize(&mut self, data: Vec<u8>) {
+        self.ram = data;
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.ram.clone()
+    }
+}
+
 struct MBC2 {
     rom: Vec<u8>,
     ram: [u8; 256],
@@ -176,7 +213,7 @@ impl MBC2 {
     }
 }
 
-impl Cartridge for MBC2 {
+impl Memory for MBC2 {
     fn read(&self, address: usize) -> u8 {
         match address {
             0x0000..=0x3FFF => self.rom[address],
@@ -207,6 +244,16 @@ impl Cartridge for MBC2 {
             }
             _ => {}
         }
+    }
+}
+
+impl Cartridge for MBC2 {
+    fn deserialize(&mut self, data: Vec<u8>) {
+        self.ram = data.try_into().unwrap();
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.ram.to_vec()
     }
 }
 
@@ -242,7 +289,7 @@ impl MBC3 {
     }
 }
 
-impl Cartridge for MBC3 {
+impl Memory for MBC3 {
     fn read(&self, address: usize) -> u8 {
         match address {
             0x0000..=0x3FFF => self.rom[address],
@@ -312,6 +359,16 @@ impl Cartridge for MBC3 {
     }
 }
 
+impl Cartridge for MBC3 {
+    fn deserialize(&mut self, data: Vec<u8>) {
+        self.ram = data;
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.ram.clone()
+    }
+}
+
 struct MBC5 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -338,7 +395,7 @@ impl MBC5 {
     }
 }
 
-impl Cartridge for MBC5 {
+impl Memory for MBC5 {
     fn read(&self, address: usize) -> u8 {
         match address {
             0x0000..=0x3FFF => self.rom[address],
@@ -375,9 +432,20 @@ impl Cartridge for MBC5 {
                 if self.enable_ram {
                     let bank = self.ram_bank * RAM_BANK_SIZE;
                     self.ram[bank + address - 0xA000] = data;
+                    println!("Wrote ram {:02X} = {:04X}", data, address)
                 }
             }
             _ => {}
         }
+    }
+}
+
+impl Cartridge for MBC5 {
+    fn deserialize(&mut self, data: Vec<u8>) {
+        self.ram = data;
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.ram.clone()
     }
 }

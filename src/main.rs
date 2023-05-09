@@ -49,6 +49,12 @@ fn run_rom(path: &str) {
         if input.key_is_down(Key::Escape) {
             return false;
         }
+        if input.key_pressed(Key::S) {
+            cpu.mmu.save_state("./save.sav");
+        }
+        if input.key_pressed(Key::L) {
+            cpu.mmu.load_state("./save.sav");
+        }
         for (from, to) in &key_mapping {
             if input.key_pressed(*from) {
                 cpu.mmu.interrupt_flag |= cpu.mmu.joypad.on_key_pressed(*to);

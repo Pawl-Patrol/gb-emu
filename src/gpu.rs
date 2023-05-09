@@ -53,7 +53,7 @@ pub struct GPU {
     pub obj_palette_1: u8,
 }
 
-impl Cartridge for GPU {
+impl Memory for GPU {
     fn read(&self, address: usize) -> u8 {
         match address {
             0x8000..=0x9FFF => self.vram[address - 0x8000],

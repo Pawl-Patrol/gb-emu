@@ -14,7 +14,7 @@ pub struct JoyPad {
     pub input: u8,
 }
 
-impl Cartridge for JoyPad {
+impl Memory for JoyPad {
     fn read(&self, address: usize) -> u8 {
         match address {
             0xFF00 => self.get_joypad_state(),

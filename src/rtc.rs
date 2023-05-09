@@ -9,7 +9,7 @@ pub struct RTC {
     pub needs_interrupt: Option<u8>,
 }
 
-impl Cartridge for RTC {
+impl Memory for RTC {
     fn read(&self, address: usize) -> u8 {
         match address {
             0xFF04 => self.divider_counter.hi(),
