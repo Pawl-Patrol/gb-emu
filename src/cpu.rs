@@ -1,5 +1,3 @@
-use crate::traits::Register;
-
 pub struct CPU {
     // 8-bit registers
     pub a: u8,

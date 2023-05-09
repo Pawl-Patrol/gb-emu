@@ -88,6 +88,15 @@ macro_rules! rotate_left {
     }};
 }
 
+macro_rules! rotate_left_memory {
+    ($emulator: ident, $addr: expr) => {{
+        let mut reg = $emulator.read_memory($addr);
+        rotate_left!($emulator, reg);
+        $emulator.write_memory($addr, reg);
+        16
+    }};
+}
+
 macro_rules! rotate_left_carry {
     ($emulator: ident, $reg: expr) => {{
         let co = $reg & 0x80;
@@ -97,6 +106,14 @@ macro_rules! rotate_left_carry {
         $emulator.cpu.f.reset_bit(FLAG_HALF_CARRY);
         $emulator.cpu.f.toggle_bit(FLAG_CARRY, co != 0);
         8
+    }};
+}
+macro_rules! rotate_left_carry_memory {
+    ($emulator: ident, $addr: expr) => {{
+        let mut reg = $emulator.read_memory($addr);
+        rotate_left_carry!($emulator, reg);
+        $emulator.write_memory($addr, reg);
+        16
     }};
 }
 
@@ -113,6 +130,15 @@ macro_rules! rotate_right {
     }};
 }
 
+macro_rules! rotate_right_memory {
+    ($emulator: ident, $addr: expr) => {{
+        let mut reg = $emulator.read_memory($addr);
+        rotate_right!($emulator, reg);
+        $emulator.write_memory($addr, reg);
+        16
+    }};
+}
+
 macro_rules! rotate_right_carry {
     ($emulator: ident, $reg: expr) => {{
         let co = $reg & 0x01;
@@ -125,34 +151,7 @@ macro_rules! rotate_right_carry {
     }};
 }
 
-macro_rules! rotate_left_memory {
-    ($emulator: ident, $addr: expr) => {{
-        let mut reg = $emulator.read_memory($addr);
-        rotate_left!($emulator, reg);
-        $emulator.write_memory($addr, reg);
-        16
-    }};
-}
-
 macro_rules! rotate_right_carry_memory {
-    ($emulator: ident, $addr: expr) => {{
-        let mut reg = $emulator.read_memory($addr);
-        rotate_right!($emulator, reg);
-        $emulator.write_memory($addr, reg);
-        16
-    }};
-}
-
-macro_rules! rotate_left_carry_memory {
-    ($emulator: ident, $addr: expr) => {{
-        let mut reg = $emulator.read_memory($addr);
-        rotate_left_carry!($emulator, reg);
-        $emulator.write_memory($addr, reg);
-        16
-    }};
-}
-
-macro_rules! rotate_right_memory {
     ($emulator: ident, $addr: expr) => {{
         let mut reg = $emulator.read_memory($addr);
         rotate_right_carry!($emulator, reg);
@@ -298,7 +297,7 @@ macro_rules! set_bit_memory {
 impl Emulator {
     fn read_byte(&mut self) -> u8 {
         let result = self.read_memory(self.cpu.pc);
-        self.cpu.pc += 1;
+        self.cpu.pc = self.cpu.pc.wrapping_add(1);
         result
     }
 
@@ -309,7 +308,7 @@ impl Emulator {
         word
     }
 
-    pub fn execute(&mut self, opcode: u8) -> u32 {
+    pub fn execute(&mut self, opcode: u8) -> u16 {
         match opcode {
             0x00 => 4, // NOP
 
@@ -865,29 +864,29 @@ impl Emulator {
         }
     }
 
-    fn execute_extended(&mut self) -> u32 {
+    fn execute_extended(&mut self) -> u16 {
         let opcode = self.read_byte();
 
         match opcode {
             // rotate left through carry
-            0x0 => rotate_left_carry!(self, self.cpu.b),
-            0x1 => rotate_left_carry!(self, self.cpu.c),
-            0x2 => rotate_left_carry!(self, self.cpu.d),
-            0x3 => rotate_left_carry!(self, self.cpu.e),
-            0x4 => rotate_left_carry!(self, self.cpu.h),
-            0x5 => rotate_left_carry!(self, self.cpu.l),
-            0x6 => rotate_left_carry_memory!(self, u16::from_bytes(self.cpu.h, self.cpu.l)),
-            0x7 => rotate_left_carry!(self, self.cpu.a),
+            0x00 => rotate_left_carry!(self, self.cpu.b),
+            0x01 => rotate_left_carry!(self, self.cpu.c),
+            0x02 => rotate_left_carry!(self, self.cpu.d),
+            0x03 => rotate_left_carry!(self, self.cpu.e),
+            0x04 => rotate_left_carry!(self, self.cpu.h),
+            0x05 => rotate_left_carry!(self, self.cpu.l),
+            0x06 => rotate_left_carry_memory!(self, u16::from_bytes(self.cpu.h, self.cpu.l)),
+            0x07 => rotate_left_carry!(self, self.cpu.a),
 
             // rotate right through carry
-            0x8 => rotate_right_carry!(self, self.cpu.b),
-            0x9 => rotate_right_carry!(self, self.cpu.c),
-            0xA => rotate_right_carry!(self, self.cpu.d),
-            0xB => rotate_right_carry!(self, self.cpu.e),
-            0xC => rotate_right_carry!(self, self.cpu.h),
-            0xD => rotate_right_carry!(self, self.cpu.l),
-            0xE => rotate_right_carry_memory!(self, u16::from_bytes(self.cpu.h, self.cpu.l)),
-            0xF => rotate_right_carry!(self, self.cpu.a),
+            0x08 => rotate_right_carry!(self, self.cpu.b),
+            0x09 => rotate_right_carry!(self, self.cpu.c),
+            0x0A => rotate_right_carry!(self, self.cpu.d),
+            0x0B => rotate_right_carry!(self, self.cpu.e),
+            0x0C => rotate_right_carry!(self, self.cpu.h),
+            0x0D => rotate_right_carry!(self, self.cpu.l),
+            0x0E => rotate_right_carry_memory!(self, u16::from_bytes(self.cpu.h, self.cpu.l)),
+            0x0F => rotate_right_carry!(self, self.cpu.a),
 
             // rotate left
             0x10 => rotate_left!(self, self.cpu.b),
@@ -1193,45 +1192,49 @@ impl Emulator {
         }
     }
 
-    fn jump(&mut self, flag: u8, use_condition: bool, condition: bool) -> u32 {
+    fn jump(&mut self, flag: u8, use_condition: bool, condition: bool) -> u16 {
         let address = self.read_word();
         if !use_condition || self.cpu.f.test_bit(flag) == condition {
             self.cpu.pc = address;
+            return 16;
         }
         12
     }
 
-    fn jump_immediate(&mut self, flag: u8, use_condition: bool, condition: bool) -> u32 {
+    fn jump_immediate(&mut self, flag: u8, use_condition: bool, condition: bool) -> u16 {
         let offset = self.read_byte() as i8 as i16;
         if !use_condition || self.cpu.f.test_bit(flag) == condition {
             self.cpu.pc = self.cpu.pc.wrapping_add_signed(offset);
+            return 12;
         }
         8
     }
 
-    fn call(&mut self, flag: u8, use_condition: bool, condition: bool) -> u32 {
+    fn call(&mut self, flag: u8, use_condition: bool, condition: bool) -> u16 {
         let address = self.read_word();
         if !use_condition || self.cpu.f.test_bit(flag) == condition {
             self.push_stack(self.cpu.pc);
             self.cpu.pc = address;
+            return 24;
         }
         12
     }
 
-    fn restart(&mut self, offset: u16) -> u32 {
+    fn restart(&mut self, offset: u16) -> u16 {
         self.push_stack(self.cpu.pc);
         self.cpu.pc = offset;
         32
     }
 
-    fn return_from_call(&mut self, flag: u8, use_condition: bool, condition: bool) -> u32 {
+    fn return_from_call(&mut self, flag: u8, use_condition: bool, condition: bool) -> u16 {
         if !use_condition || self.cpu.f.test_bit(flag) == condition {
             self.cpu.pc = self.pop_stack();
+            return 20;
         }
         8
     }
 
-    fn add_8bit(&mut self, value: Option<u8>) -> u32 {
+    fn add_8bit(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let (result, carry) = self.cpu.a.overflowing_add(value);
         self.cpu.f.toggle_bit(FLAG_ZERO, result == 0);
@@ -1244,7 +1247,7 @@ impl Emulator {
         4
     }
 
-    fn add_8bit_carry(&mut self, value: Option<u8>) -> u32 {
+    fn add_8bit_carry(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let carry = self.cpu.f.test_bit(FLAG_CARRY) as u8;
         let result = self.cpu.a.wrapping_add(value).wrapping_add(carry);
@@ -1262,7 +1265,7 @@ impl Emulator {
         4
     }
 
-    fn sub_8bit(&mut self, value: Option<u8>) -> u32 {
+    fn sub_8bit(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let (result, carry) = self.cpu.a.overflowing_sub(value);
         self.cpu.f.toggle_bit(FLAG_ZERO, result == 0);
@@ -1275,7 +1278,7 @@ impl Emulator {
         4
     }
 
-    fn sub_8bit_carry(&mut self, value: Option<u8>) -> u32 {
+    fn sub_8bit_carry(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let carry = self.cpu.f.test_bit(FLAG_CARRY) as u8;
         let result = self.cpu.a.wrapping_sub(value).wrapping_sub(carry);
@@ -1293,7 +1296,7 @@ impl Emulator {
         4
     }
 
-    fn and_8bit(&mut self, value: Option<u8>) -> u32 {
+    fn and_8bit(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         self.cpu.a &= value;
         self.cpu.f.toggle_bit(FLAG_ZERO, self.cpu.a == 0);
@@ -1303,7 +1306,7 @@ impl Emulator {
         4
     }
 
-    fn or_8bit(&mut self, value: Option<u8>) -> u32 {
+    fn or_8bit(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let result = self.cpu.a | value;
         self.cpu.f.toggle_bit(FLAG_ZERO, result == 0);
@@ -1314,7 +1317,7 @@ impl Emulator {
         4
     }
 
-    fn xor_8bit(&mut self, value: Option<u8>) -> u32 {
+    fn xor_8bit(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let result = self.cpu.a ^ value;
         self.cpu.f.toggle_bit(FLAG_ZERO, result == 0);
@@ -1325,7 +1328,7 @@ impl Emulator {
         4
     }
 
-    fn compare_8bit(&mut self, value: Option<u8>) -> u32 {
+    fn compare_8bit(&mut self, value: Option<u8>) -> u16 {
         let value = value.unwrap_or_else(|| self.read_byte());
         let (result, carry) = self.cpu.a.overflowing_sub(value);
         self.cpu.f.toggle_bit(FLAG_ZERO, result == 0);
@@ -1353,7 +1356,7 @@ impl Emulator {
         result
     }
 
-    fn add_16bit(&mut self, value: u16) -> u32 {
+    fn add_16bit(&mut self, value: u16) -> u16 {
         let hl = u16::from_bytes(self.cpu.h, self.cpu.l);
         let (result, carry) = hl.overflowing_add(value);
         self.cpu.f.reset_bit(FLAG_SUBTRACT);

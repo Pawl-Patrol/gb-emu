@@ -1,27 +1,23 @@
 pub const CPU_FREQ_IN_HZ: u32 = 4194304;
 pub const FRAME_RATE: u32 = 60;
-pub const CYCLES_PER_FRAME: u32 = CPU_FREQ_IN_HZ / FRAME_RATE;
+pub const CYCLES_PER_FRAME: u32 = 69905;
 
 // timer
-pub const TIMER_FREQ_0: u32 = CPU_FREQ_IN_HZ / 4096;
-pub const TIMER_FREQ_1: u32 = CPU_FREQ_IN_HZ / 262144;
-pub const TIMER_FREQ_2: u32 = CPU_FREQ_IN_HZ / 65536;
-pub const TIMER_FREQ_3: u32 = CPU_FREQ_IN_HZ / 16384;
-
-// color palette
-pub type Color = u8;
-pub const COLOR_WHITE: Color = 0b00;
-pub const COLOR_LIGHT_GRAY: Color = 0b01;
-pub const COLOR_DARK_GRAY: Color = 0b10;
-pub const COLOR_BLACK: Color = 11;
+pub const TIMER_FREQ_0: u32 = 1024;
+pub const TIMER_FREQ_1: u32 = 16;
+pub const TIMER_FREQ_2: u32 = 64;
+pub const TIMER_FREQ_3: u32 = 256;
 
 // screen size
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
 // bank modes
+pub const NO_MBC: u8 = 0x00;
 pub const MBC1: u8 = 0x01;
 pub const MBC2: u8 = 0x02;
+pub const MBC3: u8 = 0x03;
+pub const MBC5: u8 = 0x05;
 
 // bank sizes
 pub const ROM_BANK_SIZE: usize = 0x4000;
@@ -41,10 +37,20 @@ pub const LCD_STATUS: u16 = 0xFF41;
 pub const SCANLINE: u16 = 0xFF44;
 
 // graphics
-pub const SCANLINE_CYCLES: u32 = 456;
+pub const SCANLINE_CYCLES: u16 = 456;
 
 // arithmetic
 pub const FLAG_ZERO: u8 = 7;
 pub const FLAG_SUBTRACT: u8 = 6;
 pub const FLAG_HALF_CARRY: u8 = 5;
 pub const FLAG_CARRY: u8 = 4;
+
+// key maps
+pub const KEY_UP: u8 = 2;
+pub const KEY_DOWN: u8 = 3;
+pub const KEY_LEFT: u8 = 1;
+pub const KEY_RIGHT: u8 = 0;
+pub const KEY_A: u8 = 4;
+pub const KEY_B: u8 = 5;
+pub const KEY_START: u8 = 7;
+pub const KEY_SELECT: u8 = 6;
