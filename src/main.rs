@@ -1,7 +1,6 @@
 mod canvas;
 mod cartridge;
 mod constants;
-mod context;
 mod cpu;
 mod gpu;
 mod joypad;
@@ -10,20 +9,15 @@ mod rtc;
 mod traits;
 
 use std::{
-    borrow::BorrowMut,
-    cell::{Cell, RefCell, RefMut},
-    rc::Rc,
+    fmt::format,
+    fs::{File, OpenOptions},
+    io::Write,
 };
 
-use context::Context;
 use cpu::CPU;
-use gpu::GPU;
-use joypad::JoyPad;
 use minifb::Window;
-use mmu::MMU;
-use rtc::RTC;
 
-fn run_rom(path: &str) {
+fn run_rom(path: &str, log: bool) {
     let mut window = Window::new(
         "Gameboy Emulator",
         constants::SCREEN_WIDTH,
@@ -33,20 +27,8 @@ fn run_rom(path: &str) {
     .unwrap();
     window.limit_update_rate(Some(std::time::Duration::from_secs_f32(1.0 / 60.0)));
 
-    let mut cpu = Rc::new(Cell::new(CPU::new()));
-    let mut mmu = Rc::new(Cell::new(MMU::new()));
-    let mut rtc = Rc::new(Cell::new(RTC::new()));
-    let mut gpu = Rc::new(Cell::new(GPU::new()));
-    let mut joypad = Rc::new(Cell::new(JoyPad::new()));
-    let mut ctx = Context {
-        cpu,
-        mmu,
-        rtc,
-        gpu,
-        joypad,
-    };
-    // call mmu.load_rom(path) on ctx
-    ctx.mmu.get_mut().load_rom(path);
+    let mut cpu = CPU::new();
+    cpu.mmu.load_rom(path);
 
     let key_mapping = vec![
         (minifb::Key::Up, constants::KEY_UP),
@@ -59,6 +41,19 @@ fn run_rom(path: &str) {
         (minifb::Key::Space, constants::KEY_SELECT),
     ];
 
+    let mut file: Option<File> = None;
+    if log {
+        // delete old file if exists
+        std::fs::remove_file("out.txt").unwrap_or_default();
+        // create new empty file in append mode
+        file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(true)
+            .open("out.txt")
+            .ok();
+    }
+
     let mut last = std::time::Instant::now();
     loop {
         let now = std::time::Instant::now();
@@ -70,25 +65,54 @@ fn run_rom(path: &str) {
         }
         for (from, to) in &key_mapping {
             if window.is_key_down(*from) {
-                ctx.joypad.get_mut().on_key_pressed(&mut ctx, *to);
+                cpu.mmu.joypad.on_key_pressed(*to);
             } else if window.is_key_released(*from) {
-                ctx.joypad.get_mut().on_key_released(*to);
+                cpu.mmu.joypad.on_key_released(*to);
             }
         }
 
         let ticks = elapsed * 4194304 / 1000000;
         let mut cycles = 0;
         while cycles < ticks {
-            let c = ctx.cpu.get_mut().execute_next_opcode(&mut ctx);
-            ctx.rtc.get_mut().update_timers(&mut ctx, c);
-            ctx.gpu.get_mut().update_graphics(&mut ctx, c);
-            ctx.cpu.get_mut().do_interrupts(&mut ctx);
+            // log A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
+            let str  = format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
+                cpu.a,
+                cpu.f,
+                cpu.b,
+                cpu.c,
+                cpu.d,
+                cpu.e,
+                cpu.h,
+                cpu.l,
+                cpu.sp,
+                cpu.pc,
+                cpu.mmu.read(cpu.pc),
+                cpu.mmu.read(cpu.pc + 1),
+                cpu.mmu.read(cpu.pc + 2),
+                cpu.mmu.read(cpu.pc + 3),
+            );
+            if let Some(f) = &mut file {
+                f.write_all(str.as_bytes()).unwrap();
+            }
+            if let Some(i) = cpu.mmu.joypad.needs_interrupt {
+                cpu.request_interrupt(i)
+            }
+            let c = cpu.execute_next_opcode();
+            cpu.mmu.rtc.update_timers(c);
+            if let Some(i) = cpu.mmu.rtc.needs_interrupt {
+                cpu.request_interrupt(i)
+            }
+            cpu.mmu.gpu.update_graphics(c);
+            if let Some(i) = cpu.mmu.gpu.needs_interrupt {
+                cpu.request_interrupt(i)
+            }
+            cpu.do_interrupts();
             cycles += c as u128;
         }
 
         window
             .update_with_buffer(
-                &ctx.gpu.video_buffer,
+                &cpu.mmu.gpu.video_buffer,
                 constants::SCREEN_WIDTH,
                 constants::SCREEN_HEIGHT,
             )
@@ -97,5 +121,5 @@ fn run_rom(path: &str) {
 }
 
 fn main() {
-    run_rom("./roms/pokemon.gb");
+    run_rom("./roms/tetris.gb", false);
 }

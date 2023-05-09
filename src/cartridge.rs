@@ -1,6 +1,6 @@
 use std::io::{Read, Result, Seek};
 
-use crate::traits::TestBit;
+use crate::traits::{Cartridge, TestBit};
 
 const REGISTER_CARTRIDGE_TYPE: usize = 0x0147;
 const REGISTER_ROM_SIZE: usize = 0x0148;
@@ -13,7 +13,7 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
     file.seek(std::io::SeekFrom::Start(REGISTER_CARTRIDGE_TYPE as u64))?;
     let mut buffer = [0_u8; 1];
     file.read_exact(&mut buffer)?;
-    println!("Cartridge type: {:#04X}", buffer[0]);
+    // println!("Cartridge type: {:#04X}", buffer[0]);
     match buffer[0] {
         0x00 | 0x08 | 0x09 => Ok(Box::new(NoMBC::load(path))),
         0x01 | 0x02 | 0x03 => Ok(Box::new(MBC1::load(path))),
@@ -48,11 +48,6 @@ fn get_ram_size(value: u8) -> usize {
         0x05 => RAM_BANK_SIZE * 8,
         _ => panic!("Unused ram size!"),
     }
-}
-
-pub trait Cartridge {
-    fn read(&self, address: usize) -> u8;
-    fn write(&mut self, address: usize, data: u8);
 }
 
 struct NoMBC {

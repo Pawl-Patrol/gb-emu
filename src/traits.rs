@@ -1,3 +1,8 @@
+pub trait Cartridge {
+    fn read(&self, address: usize) -> u8;
+    fn write(&mut self, address: usize, data: u8);
+}
+
 pub trait Register {
     fn hi(&self) -> u8;
     fn lo(&self) -> u8;
