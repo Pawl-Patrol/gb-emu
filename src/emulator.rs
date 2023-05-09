@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::canvas::{COLOR_BLACK, COLOR_DARK_GRAY, COLOR_LIGHT_GRAY, COLOR_WHITE};
-use crate::cartridge::Cartridge;
+use crate::cartridge::{load_rom, Cartridge};
 use crate::constants::*;
 use crate::cpu::CPU;
 use crate::mmu::MMU;
@@ -10,7 +10,7 @@ use crate::traits::{Register, SetBit, TestBit};
 pub struct Emulator {
     pub cpu: CPU,
     pub mmu: MMU,
-    pub cartrige: Cartridge,
+    pub cartrige: Option<Box<dyn Cartridge>>,
     pub current_rom_bank: usize,
     pub current_ram_bank: usize,
     pub rom_banking: bool,
@@ -30,7 +30,7 @@ impl Emulator {
         Emulator {
             cpu: CPU::new(),
             mmu: MMU::new(),
-            cartrige: Cartridge::new(),
+            cartrige: None,
             current_rom_bank: 1,
             current_ram_bank: 0,
             enable_ram: false,
@@ -47,9 +47,8 @@ impl Emulator {
     }
 
     pub fn load_rom(&mut self, path: &str) {
-        self.cartrige.load(path);
-        // load rom bank 0
-        self.mmu.memory[0..0x4000].copy_from_slice(&self.cartrige.rom[0..0x4000]);
+        // result to option
+        self.cartrige = load_rom(path).ok();
     }
 
     pub fn update(&mut self) {
@@ -452,16 +451,8 @@ impl Emulator {
     }
 
     pub fn read_memory(&self, address: u16) -> u8 {
-        if address >= 0x4000 && address <= 0x7FFF {
-            // rom memory bank
-            let rom_address = address as usize - 0x4000;
-            let bank_offset = self.current_rom_bank * ROM_BANK_SIZE;
-            return self.cartrige.rom[rom_address + bank_offset];
-        } else if address >= 0xA000 && address < 0xC000 {
-            // ram memory bank
-            let ram_address = address as usize - 0xA000;
-            let bank_offset = self.current_ram_bank * RAM_BANK_SIZE;
-            return self.cartrige.ram[ram_address + bank_offset];
+        if (address < 0x8000) || (address >= 0xA000 && address < 0xC000) {
+            return self.cartrige.as_ref().unwrap().read(address);
         } else if address >= 0xE000 && address < 0xFE00 {
             // echo ram
             return self.read_memory(address - 0x2000);
@@ -477,15 +468,8 @@ impl Emulator {
     }
 
     pub fn write_memory(&mut self, address: u16, data: u8) {
-        if address < 0x8000 {
-            self.handle_banking(address, data);
-        } else if address >= 0xA000 && address < 0xC000 {
-            if self.enable_ram {
-                let ram_address = address as usize - 0xA000;
-                let bank_offset = self.current_ram_bank * RAM_BANK_SIZE;
-                self.cartrige.ram[ram_address + bank_offset] = data;
-            }
-            return;
+        if (address < 0x8000) || (address >= 0xA000 && address < 0xC000) {
+            return self.cartrige.as_mut().unwrap().write(address, data);
         } else if address >= 0xFEA0 && address < 0xFEFF {
             return; // prohibited
         } else if address >= 0xE000 && address < 0xFE00 {
@@ -523,92 +507,6 @@ impl Emulator {
         for i in 0..0xA0 {
             let value = self.read_memory(address + i);
             self.write_memory(0xFE00 + i, value);
-        }
-    }
-
-    fn handle_banking(&mut self, address: u16, data: u8) {
-        if address < 0x2000 {
-            if self.cartrige.bank_mode == MBC1
-                || self.cartrige.bank_mode == MBC2
-                || self.cartrige.bank_mode == MBC3
-                || self.cartrige.bank_mode == MBC5
-            {
-                self.enable_ram_banking(address, data);
-            }
-        } else if address >= 0x200 && address < 0x4000 {
-            if self.cartrige.bank_mode == MBC1
-                || self.cartrige.bank_mode == MBC2
-                || self.cartrige.bank_mode == MBC3
-                || self.cartrige.bank_mode == MBC5
-            {
-                self.change_lo_ram_bank(data);
-            }
-        } else if address >= 0x4000 && address < 0x6000 {
-            if self.cartrige.bank_mode == MBC1 {
-                if self.rom_banking {
-                    self.change_hi_rom_bank(data);
-                } else {
-                    self.change_ram_bank(data);
-                }
-            }
-        } else if address >= 0x6000 && address < 0x8000 {
-            if self.cartrige.bank_mode == MBC1 {
-                self.change_rom_ram_mode(data);
-            }
-        }
-    }
-
-    fn enable_ram_banking(&mut self, address: u16, data: u8) {
-        if (self.cartrige.bank_mode == MBC2
-            || self.cartrige.bank_mode == MBC3
-            || self.cartrige.bank_mode == MBC5)
-            && address.test_bit(4)
-        {
-            return;
-        }
-
-        let test_data = data & 0xF;
-        if test_data == 0xA {
-            self.enable_ram = true;
-        } else if test_data == 0x0 {
-            self.enable_ram = false;
-        }
-    }
-
-    fn change_lo_ram_bank(&mut self, data: u8) {
-        if self.cartrige.bank_mode == MBC1 {
-            let lower5 = data & 0b0001_1111;
-            self.current_rom_bank &= 0b1110_0000;
-            self.current_rom_bank |= lower5 as usize;
-        } else if self.cartrige.bank_mode == MBC2
-            || self.cartrige.bank_mode == MBC3
-            || self.cartrige.bank_mode == MBC5
-        {
-            self.current_rom_bank = (data & 0b0000_1111) as usize;
-        }
-
-        if self.current_rom_bank == 0 {
-            self.current_rom_bank = 1;
-        }
-    }
-
-    fn change_hi_rom_bank(&mut self, data: u8) {
-        self.current_rom_bank &= 0b0001_1111;
-        self.current_rom_bank |= (data & 0b1110_0000) as usize;
-
-        if self.current_rom_bank == 0 {
-            self.current_rom_bank = 1;
-        }
-    }
-
-    fn change_ram_bank(&mut self, data: u8) {
-        self.current_ram_bank = (data & 0b0000_0011) as usize;
-    }
-
-    fn change_rom_ram_mode(&mut self, data: u8) {
-        self.rom_banking = !data.test_bit(0);
-        if self.rom_banking {
-            self.current_ram_bank = 0;
         }
     }
 

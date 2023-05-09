@@ -111,5 +111,5 @@ fn run_test_rom(path: &str) {
 }
 
 fn main() {
-    run_rom("./roms/mario.gb");
+    run_rom("./roms/tetris.gb");
 }

@@ -12,13 +12,6 @@ pub const TIMER_FREQ_3: u32 = 256;
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
-// bank modes
-pub const NO_MBC: u8 = 0x00;
-pub const MBC1: u8 = 0x01;
-pub const MBC2: u8 = 0x02;
-pub const MBC3: u8 = 0x03;
-pub const MBC5: u8 = 0x05;
-
 // bank sizes
 pub const ROM_BANK_SIZE: usize = 0x4000;
 pub const RAM_BANK_SIZE: usize = 0x2000;
