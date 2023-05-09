@@ -29,10 +29,12 @@ impl Cartridge for RTC {
             0xFF05 => self.tima = data,
             0xFF06 => self.tma = data,
             0xFF07 => {
-                if data != self.tac {
+                let before = self.get_clock_frequency();
+                self.tac = data;
+                let after = self.get_clock_frequency();
+                if after != before {
                     self.timer_counter = 0;
                 }
-                self.tac = data;
             }
             _ => panic!("Invalid RTC address"),
         }

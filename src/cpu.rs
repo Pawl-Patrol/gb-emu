@@ -1,9 +1,5 @@
-use std::fs::OpenOptions;
-
 use crate::{
-    constants::{
-        FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO, INTERRUPT_ENABLE, INTERRUPT_FLAG,
-    },
+    constants::{FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO},
     mmu::MMU,
     traits::{CarryTest, Register, SetBit, TestBit, ToggleBit},
 };
@@ -109,7 +105,6 @@ impl CPU {
     }
 
     pub fn request_interrupt(&mut self, id: u8) {
-        println!("Requesting interrupt {}", id);
         self.mmu.interrupt_flag.set_bit(id);
     }
 
@@ -774,6 +769,7 @@ impl CPU {
                 macro_rules! perform_in_memory {
                     ($macro: ident $(, $arg: expr)*) => {{
                         let hl = self.hl();
+                        #[allow(unused_mut)]
                         let mut reg = self.mmu.read(hl);
                         let cycles = $macro!(reg $(, $arg)*);
                         self.mmu.write(hl, reg);

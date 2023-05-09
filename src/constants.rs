@@ -2,19 +2,6 @@
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
-// special addresses
-pub const TIMA: u16 = 0xFF05;
-pub const TMA: u16 = 0xFF06;
-pub const TMC: u16 = 0xFF07;
-pub const DIV: u16 = 0xFF04;
-pub const INTERRUPT_FLAG: u16 = 0xFF0F;
-pub const INTERRUPT_ENABLE: u16 = 0xFFFF;
-pub const LYC: u16 = 0xFF45;
-pub const DMA: u16 = 0xFF46;
-pub const LCD_CONTROL: u16 = 0xFF40;
-pub const LCD_STATUS: u16 = 0xFF41;
-pub const SCANLINE: u16 = 0xFF44;
-
 // graphics
 pub const SCANLINE_CYCLES: u16 = 456;
 

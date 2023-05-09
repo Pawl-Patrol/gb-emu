@@ -19,6 +19,46 @@ pub struct GPU {
     pub obj_palette_2: u8,
 }
 
+impl Cartridge for GPU {
+    fn read(&self, address: usize) -> u8 {
+        match address {
+            0x8000..=0x9FFF => self.vram[address - 0x8000],
+            0xFE00..=0xFE9F => self.oam[address - 0xFE00],
+            0xFF40 => self.lcd_control,
+            0xFF41 => self.lcd_status,
+            0xFF42 => self.scroll_y,
+            0xFF43 => self.scroll_x,
+            0xFF44 => 0x90, //self.ly,
+            0xFF45 => self.ly_compare,
+            0xFF47 => self.bg_palette,
+            0xFF48 => self.obj_palette_1,
+            0xFF49 => self.obj_palette_2,
+            0xFF4A => self.window_y,
+            0xFF4B => self.window_x,
+            _ => panic!("Invalid gpu address: 0x{:X}", address),
+        }
+    }
+
+    fn write(&mut self, address: usize, value: u8) {
+        match address {
+            0x8000..=0x9FFF => self.vram[address - 0x8000] = value,
+            0xFE00..=0xFE9F => self.oam[address - 0xFE00] = value,
+            0xFF40 => self.lcd_control = value,
+            0xFF41 => self.lcd_status = value,
+            0xFF42 => self.scroll_y = value,
+            0xFF43 => self.scroll_x = value,
+            0xFF44 => self.ly = 0,
+            0xFF45 => self.ly_compare = value,
+            0xFF47 => self.bg_palette = value,
+            0xFF48 => self.obj_palette_1 = value,
+            0xFF49 => self.obj_palette_2 = value,
+            0xFF4A => self.window_y = value,
+            0xFF4B => self.window_x = value,
+            _ => panic!("Invalid gpu address: 0x{:X}", address),
+        }
+    }
+}
+
 impl GPU {
     pub fn new() -> GPU {
         GPU {
@@ -276,46 +316,6 @@ impl GPU {
             2 => COLOR_DARK_GRAY,
             3 => COLOR_BLACK,
             _ => panic!("Invalid color"),
-        }
-    }
-}
-
-impl Cartridge for GPU {
-    fn read(&self, address: usize) -> u8 {
-        match address {
-            0x8000..=0x9FFF => self.vram[address - 0x8000],
-            0xFE00..=0xFE9F => self.oam[address - 0xFE00],
-            0xFF40 => self.lcd_control,
-            0xFF41 => self.lcd_status,
-            0xFF42 => self.scroll_y,
-            0xFF43 => self.scroll_x,
-            0xFF44 => self.ly,
-            0xFF45 => self.ly_compare,
-            0xFF47 => self.bg_palette,
-            0xFF48 => self.obj_palette_1,
-            0xFF49 => self.obj_palette_2,
-            0xFF4A => self.window_y,
-            0xFF4B => self.window_x,
-            _ => panic!("Invalid gpu address: 0x{:X}", address),
-        }
-    }
-
-    fn write(&mut self, address: usize, value: u8) {
-        match address {
-            0x8000..=0x9FFF => self.vram[address - 0x8000] = value,
-            0xFE00..=0xFE9F => self.oam[address - 0xFE00] = value,
-            0xFF40 => self.lcd_control = value,
-            0xFF41 => self.lcd_status = value,
-            0xFF42 => self.scroll_y = value,
-            0xFF43 => self.scroll_x = value,
-            0xFF44 => self.ly = 0,
-            0xFF45 => self.ly_compare = value,
-            0xFF47 => self.bg_palette = value,
-            0xFF48 => self.obj_palette_1 = value,
-            0xFF49 => self.obj_palette_2 = value,
-            0xFF4A => self.window_y = value,
-            0xFF4B => self.window_x = value,
-            _ => panic!("Invalid gpu address: 0x{:X}", address),
         }
     }
 }

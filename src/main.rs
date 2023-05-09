@@ -9,7 +9,6 @@ mod rtc;
 mod traits;
 
 use std::{
-    fmt::format,
     fs::{File, OpenOptions},
     io::Write,
 };
@@ -121,5 +120,5 @@ fn run_rom(path: &str, log: bool) {
 }
 
 fn main() {
-    run_rom("./roms/tetris.gb", false);
+    run_rom("./roms/instr_timing.gb", true);
 }

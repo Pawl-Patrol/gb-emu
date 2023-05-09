@@ -9,14 +9,7 @@ pub struct JoyPad {
 impl Cartridge for JoyPad {
     fn read(&self, address: usize) -> u8 {
         match address {
-            0xFF00 => {
-                println!(
-                    "read from joypad: {:04X} = {:02X}",
-                    address,
-                    self.get_joypad_state()
-                );
-                self.get_joypad_state()
-            }
+            0xFF00 => self.get_joypad_state(),
             _ => panic!("Invalid JoyPad address"),
         }
     }

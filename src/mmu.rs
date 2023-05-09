@@ -1,6 +1,4 @@
-use crate::{
-    cartridge::load_rom, constants::DMA, gpu::GPU, joypad::JoyPad, rtc::RTC, traits::Cartridge,
-};
+use crate::{cartridge::load_rom, gpu::GPU, joypad::JoyPad, rtc::RTC, traits::Cartridge};
 
 pub struct MMU {
     pub cartrige: Option<Box<dyn Cartridge>>,
@@ -8,8 +6,6 @@ pub struct MMU {
     pub rtc: RTC,
     pub joypad: JoyPad,
 
-    pub is_in_bios: bool,
-    pub bios: [u8; 0x100],  // biosj
     pub wram: [u8; 0x2000], // work ram
     pub hram: [u8; 0x7F],   // high ram
     pub interrupt_enable: u8,
@@ -58,8 +54,6 @@ impl MMU {
             gpu: GPU::new(),
             rtc: RTC::new(),
             joypad: JoyPad::new(),
-            is_in_bios: false,
-            bios: [0; 0x100],
             wram: [0; 0x2000],
             hram: [0; 0x7F],
             interrupt_enable: 0x00,
@@ -85,8 +79,6 @@ impl MMU {
     // TODO: replace u16 with usize
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            // bios
-            0x0000..=0x00FF if self.is_in_bios => self.bios[address as usize],
             // rom
             0x0000..=0x7FFF | 0xA000..=0xBFFF => {
                 self.cartrige.as_ref().unwrap().read(address as usize)
@@ -113,10 +105,7 @@ impl MMU {
             // IE
             0xFFFF => self.interrupt_enable,
             // backup
-            0xFF00..=0xFF7F => {
-                println!("read from io: {:04X}", address);
-                self.io_backup[(address - 0xFF00) as usize]
-            }
+            0xFF00..=0xFF7F => self.io_backup[(address - 0xFF00) as usize],
         }
     }
 
@@ -153,7 +142,6 @@ impl MMU {
             0xFFFF => self.interrupt_enable = value,
             // backup
             0xFF00..=0xFF7F => {
-                println!("write to io: {:X} = {:X}", address, value);
                 self.io_backup[(address - 0xFF00) as usize] = value;
             }
         }
