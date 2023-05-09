@@ -244,7 +244,7 @@ impl CPU {
             ($action: expr) => {{
                 let cycles = $action;
                 self.f.reset_bit(FLAG_ZERO);
-                cycles
+                cycles - 4
             }};
         }
 
@@ -252,12 +252,12 @@ impl CPU {
             0x00 => 4, // NOP
 
             // 8-bit loads
-            0x06 => load!(self.b, self.read_immediate_byte()), // LD B, n
-            0x0E => load!(self.c, self.read_immediate_byte()), // LD C, n
-            0x16 => load!(self.d, self.read_immediate_byte()), // LD D, n
-            0x1E => load!(self.e, self.read_immediate_byte()), // LD E, n
-            0x26 => load!(self.h, self.read_immediate_byte()), // LD H, n
-            0x2E => load!(self.l, self.read_immediate_byte()), // LD L, n
+            0x06 => load!(self.b, self.read_immediate_byte()) + 4, // LD B, n
+            0x0E => load!(self.c, self.read_immediate_byte()) + 4, // LD C, n
+            0x16 => load!(self.d, self.read_immediate_byte()) + 4, // LD D, n
+            0x1E => load!(self.e, self.read_immediate_byte()) + 4, // LD E, n
+            0x26 => load!(self.h, self.read_immediate_byte()) + 4, // LD H, n
+            0x2E => load!(self.l, self.read_immediate_byte()) + 4, // LD L, n
 
             // load register
             0x7F => load!(self.a, self.a), // LD A, A
@@ -343,12 +343,12 @@ impl CPU {
             0xE2 => write!(u16::from_bytes(0xFF, self.c), self.a),
 
             // put memory into a, decrement/increment HL
-            0x3A => read!(self.hl(), self.a) + op_16bit!(h, l, wrapping_sub),
-            0x2A => read!(self.hl(), self.a) + op_16bit!(h, l, wrapping_add),
+            0x3A => read!(self.hl(), self.a) + op_16bit!(h, l, wrapping_sub) - 8,
+            0x2A => read!(self.hl(), self.a) + op_16bit!(h, l, wrapping_add) - 8,
 
             // put a into memory, decrement/increment memory
-            0x32 => write!(self.hl(), self.a) + op_16bit!(h, l, wrapping_sub),
-            0x22 => write!(self.hl(), self.a) + op_16bit!(h, l, wrapping_add),
+            0x32 => write!(self.hl(), self.a) + op_16bit!(h, l, wrapping_sub) - 8,
+            0x22 => write!(self.hl(), self.a) + op_16bit!(h, l, wrapping_add) - 8,
 
             // 16 bit loads
             0x01 => load_16bit!(b, c, self.read_immediate_word()),
@@ -592,7 +592,10 @@ impl CPU {
             0xDC => self.call(FLAG_CARRY, true, true),
 
             // return
-            0xC9 => self.return_from_call(0, false, false),
+            0xC9 => {
+                self.return_from_call(0, false, false);
+                16
+            }
             0xC0 => self.return_from_call(FLAG_ZERO, true, false),
             0xC8 => self.return_from_call(FLAG_ZERO, true, true),
             0xD0 => self.return_from_call(FLAG_CARRY, true, false),
@@ -644,7 +647,7 @@ impl CPU {
             0xD9 => {
                 self.pc = self.pop_stack();
                 self.interrupt_master_enable = true;
-                8
+                16
             }
 
             0x08 => {
@@ -773,7 +776,7 @@ impl CPU {
                         let mut reg = self.mmu.read(hl);
                         let cycles = $macro!(reg $(, $arg)*);
                         self.mmu.write(hl, reg);
-                        cycles + 8
+                        cycles
                     }};
                 }
 
@@ -858,7 +861,7 @@ impl CPU {
                     0x03 => rotate_left_carry!(self.e),
                     0x04 => rotate_left_carry!(self.h),
                     0x05 => rotate_left_carry!(self.l),
-                    0x06 => perform_in_memory!(rotate_left_carry),
+                    0x06 => perform_in_memory!(rotate_left_carry) + 8,
 
                     // rotate right carry
                     0x0F => rotate_right_carry!(self.a),
@@ -868,7 +871,7 @@ impl CPU {
                     0x0B => rotate_right_carry!(self.e),
                     0x0C => rotate_right_carry!(self.h),
                     0x0D => rotate_right_carry!(self.l),
-                    0x0E => perform_in_memory!(rotate_right_carry),
+                    0x0E => perform_in_memory!(rotate_right_carry) + 8,
 
                     // rotate left
                     0x17 => rotate_left!(self.a),
@@ -878,7 +881,7 @@ impl CPU {
                     0x13 => rotate_left!(self.e),
                     0x14 => rotate_left!(self.h),
                     0x15 => rotate_left!(self.l),
-                    0x16 => perform_in_memory!(rotate_left),
+                    0x16 => perform_in_memory!(rotate_left) + 8,
 
                     // rotate right
                     0x1F => rotate_right!(self.a),
@@ -888,7 +891,7 @@ impl CPU {
                     0x1B => rotate_right!(self.e),
                     0x1C => rotate_right!(self.h),
                     0x1D => rotate_right!(self.l),
-                    0x1E => perform_in_memory!(rotate_right),
+                    0x1E => perform_in_memory!(rotate_right) + 8,
 
                     // shift left arithmetic
                     0x27 => shift_left_arithmetic!(self.a),
@@ -898,7 +901,7 @@ impl CPU {
                     0x23 => shift_left_arithmetic!(self.e),
                     0x24 => shift_left_arithmetic!(self.h),
                     0x25 => shift_left_arithmetic!(self.l),
-                    0x26 => perform_in_memory!(shift_left_arithmetic),
+                    0x26 => perform_in_memory!(shift_left_arithmetic) + 8,
 
                     // shift right arithmetic
                     0x2F => shift_right_arithmetic!(self.a),
@@ -908,7 +911,7 @@ impl CPU {
                     0x2B => shift_right_arithmetic!(self.e),
                     0x2C => shift_right_arithmetic!(self.h),
                     0x2D => shift_right_arithmetic!(self.l),
-                    0x2E => perform_in_memory!(shift_right_arithmetic),
+                    0x2E => perform_in_memory!(shift_right_arithmetic) + 8,
 
                     // shift right logical
                     0x3F => shift_right_logical!(self.a),
@@ -918,7 +921,7 @@ impl CPU {
                     0x3B => shift_right_logical!(self.e),
                     0x3C => shift_right_logical!(self.h),
                     0x3D => shift_right_logical!(self.l),
-                    0x3E => perform_in_memory!(shift_right_logical),
+                    0x3E => perform_in_memory!(shift_right_logical) + 8,
 
                     // swap nibbles
                     0x37 => swap_nibbles!(self.a),
@@ -928,7 +931,7 @@ impl CPU {
                     0x33 => swap_nibbles!(self.e),
                     0x34 => swap_nibbles!(self.h),
                     0x35 => swap_nibbles!(self.l),
-                    0x36 => perform_in_memory!(swap_nibbles),
+                    0x36 => perform_in_memory!(swap_nibbles) + 8,
 
                     // test bit 0
                     0x47 => test_bit!(self.a, 0),
@@ -938,7 +941,7 @@ impl CPU {
                     0x43 => test_bit!(self.e, 0),
                     0x44 => test_bit!(self.h, 0),
                     0x45 => test_bit!(self.l, 0),
-                    0x46 => perform_in_memory!(test_bit, 0),
+                    0x46 => perform_in_memory!(test_bit, 0) + 4,
 
                     // test bit 1
                     0x4F => test_bit!(self.a, 1),
@@ -948,7 +951,7 @@ impl CPU {
                     0x4B => test_bit!(self.e, 1),
                     0x4C => test_bit!(self.h, 1),
                     0x4D => test_bit!(self.l, 1),
-                    0x4E => perform_in_memory!(test_bit, 1),
+                    0x4E => perform_in_memory!(test_bit, 1) + 4,
 
                     // test bit 2
                     0x57 => test_bit!(self.a, 2),
@@ -958,7 +961,7 @@ impl CPU {
                     0x53 => test_bit!(self.e, 2),
                     0x54 => test_bit!(self.h, 2),
                     0x55 => test_bit!(self.l, 2),
-                    0x56 => perform_in_memory!(test_bit, 2),
+                    0x56 => perform_in_memory!(test_bit, 2) + 4,
 
                     // test bit 3
                     0x5F => test_bit!(self.a, 3),
@@ -968,7 +971,7 @@ impl CPU {
                     0x5B => test_bit!(self.e, 3),
                     0x5C => test_bit!(self.h, 3),
                     0x5D => test_bit!(self.l, 3),
-                    0x5E => perform_in_memory!(test_bit, 3),
+                    0x5E => perform_in_memory!(test_bit, 3) + 4,
 
                     // test bit 4
                     0x67 => test_bit!(self.a, 4),
@@ -978,7 +981,7 @@ impl CPU {
                     0x63 => test_bit!(self.e, 4),
                     0x64 => test_bit!(self.h, 4),
                     0x65 => test_bit!(self.l, 4),
-                    0x66 => perform_in_memory!(test_bit, 4),
+                    0x66 => perform_in_memory!(test_bit, 4) + 4,
 
                     // test bit 5
                     0x6F => test_bit!(self.a, 5),
@@ -988,7 +991,7 @@ impl CPU {
                     0x6B => test_bit!(self.e, 5),
                     0x6C => test_bit!(self.h, 5),
                     0x6D => test_bit!(self.l, 5),
-                    0x6E => perform_in_memory!(test_bit, 5),
+                    0x6E => perform_in_memory!(test_bit, 5) + 4,
 
                     // test bit 6
                     0x77 => test_bit!(self.a, 6),
@@ -998,7 +1001,7 @@ impl CPU {
                     0x73 => test_bit!(self.e, 6),
                     0x74 => test_bit!(self.h, 6),
                     0x75 => test_bit!(self.l, 6),
-                    0x76 => perform_in_memory!(test_bit, 6),
+                    0x76 => perform_in_memory!(test_bit, 6) + 4,
 
                     // test bit 7
                     0x7F => test_bit!(self.a, 7),
@@ -1008,7 +1011,7 @@ impl CPU {
                     0x7B => test_bit!(self.e, 7),
                     0x7C => test_bit!(self.h, 7),
                     0x7D => test_bit!(self.l, 7),
-                    0x7E => perform_in_memory!(test_bit, 7),
+                    0x7E => perform_in_memory!(test_bit, 7) + 4,
 
                     // reset bit 0
                     0x87 => reset_bit!(self.a, 0),
@@ -1018,7 +1021,7 @@ impl CPU {
                     0x83 => reset_bit!(self.e, 0),
                     0x84 => reset_bit!(self.h, 0),
                     0x85 => reset_bit!(self.l, 0),
-                    0x86 => perform_in_memory!(reset_bit, 0),
+                    0x86 => perform_in_memory!(reset_bit, 0) + 8,
 
                     // reset bit 1
                     0x8F => reset_bit!(self.a, 1),
@@ -1028,7 +1031,7 @@ impl CPU {
                     0x8B => reset_bit!(self.e, 1),
                     0x8C => reset_bit!(self.h, 1),
                     0x8D => reset_bit!(self.l, 1),
-                    0x8E => perform_in_memory!(reset_bit, 1),
+                    0x8E => perform_in_memory!(reset_bit, 1) + 8,
 
                     // reset bit 2
                     0x97 => reset_bit!(self.a, 2),
@@ -1038,7 +1041,7 @@ impl CPU {
                     0x93 => reset_bit!(self.e, 2),
                     0x94 => reset_bit!(self.h, 2),
                     0x95 => reset_bit!(self.l, 2),
-                    0x96 => perform_in_memory!(reset_bit, 2),
+                    0x96 => perform_in_memory!(reset_bit, 2) + 8,
 
                     // reset bit 3
                     0x9F => reset_bit!(self.a, 3),
@@ -1048,7 +1051,7 @@ impl CPU {
                     0x9B => reset_bit!(self.e, 3),
                     0x9C => reset_bit!(self.h, 3),
                     0x9D => reset_bit!(self.l, 3),
-                    0x9E => perform_in_memory!(reset_bit, 3),
+                    0x9E => perform_in_memory!(reset_bit, 3) + 8,
 
                     // reset bit 4
                     0xA7 => reset_bit!(self.a, 4),
@@ -1058,7 +1061,7 @@ impl CPU {
                     0xA3 => reset_bit!(self.e, 4),
                     0xA4 => reset_bit!(self.h, 4),
                     0xA5 => reset_bit!(self.l, 4),
-                    0xA6 => perform_in_memory!(reset_bit, 4),
+                    0xA6 => perform_in_memory!(reset_bit, 4) + 8,
 
                     // reset bit 5
                     0xAF => reset_bit!(self.a, 5),
@@ -1068,7 +1071,7 @@ impl CPU {
                     0xAB => reset_bit!(self.e, 5),
                     0xAC => reset_bit!(self.h, 5),
                     0xAD => reset_bit!(self.l, 5),
-                    0xAE => perform_in_memory!(reset_bit, 5),
+                    0xAE => perform_in_memory!(reset_bit, 5) + 8,
 
                     // reset bit 6
                     0xB7 => reset_bit!(self.a, 6),
@@ -1078,7 +1081,7 @@ impl CPU {
                     0xB3 => reset_bit!(self.e, 6),
                     0xB4 => reset_bit!(self.h, 6),
                     0xB5 => reset_bit!(self.l, 6),
-                    0xB6 => perform_in_memory!(reset_bit, 6),
+                    0xB6 => perform_in_memory!(reset_bit, 6) + 8,
 
                     // reset bit 7
                     0xBF => reset_bit!(self.a, 7),
@@ -1088,7 +1091,7 @@ impl CPU {
                     0xBB => reset_bit!(self.e, 7),
                     0xBC => reset_bit!(self.h, 7),
                     0xBD => reset_bit!(self.l, 7),
-                    0xBE => perform_in_memory!(reset_bit, 7),
+                    0xBE => perform_in_memory!(reset_bit, 7) + 8,
 
                     // set bit 0
                     0xC7 => set_bit!(self.a, 0),
@@ -1098,7 +1101,7 @@ impl CPU {
                     0xC3 => set_bit!(self.e, 0),
                     0xC4 => set_bit!(self.h, 0),
                     0xC5 => set_bit!(self.l, 0),
-                    0xC6 => perform_in_memory!(set_bit, 0),
+                    0xC6 => perform_in_memory!(set_bit, 0) + 8,
 
                     // set bit 1
                     0xCF => set_bit!(self.a, 1),
@@ -1108,7 +1111,7 @@ impl CPU {
                     0xCB => set_bit!(self.e, 1),
                     0xCC => set_bit!(self.h, 1),
                     0xCD => set_bit!(self.l, 1),
-                    0xCE => perform_in_memory!(set_bit, 1),
+                    0xCE => perform_in_memory!(set_bit, 1) + 8,
 
                     // set bit 2
                     0xD7 => set_bit!(self.a, 2),
@@ -1118,7 +1121,7 @@ impl CPU {
                     0xD3 => set_bit!(self.e, 2),
                     0xD4 => set_bit!(self.h, 2),
                     0xD5 => set_bit!(self.l, 2),
-                    0xD6 => perform_in_memory!(set_bit, 2),
+                    0xD6 => perform_in_memory!(set_bit, 2) + 8,
 
                     // set bit 3
                     0xDF => set_bit!(self.a, 3),
@@ -1128,7 +1131,7 @@ impl CPU {
                     0xDB => set_bit!(self.e, 3),
                     0xDC => set_bit!(self.h, 3),
                     0xDD => set_bit!(self.l, 3),
-                    0xDE => perform_in_memory!(set_bit, 3),
+                    0xDE => perform_in_memory!(set_bit, 3) + 8,
 
                     // set bit 4
                     0xE7 => set_bit!(self.a, 4),
@@ -1138,7 +1141,7 @@ impl CPU {
                     0xE3 => set_bit!(self.e, 4),
                     0xE4 => set_bit!(self.h, 4),
                     0xE5 => set_bit!(self.l, 4),
-                    0xE6 => perform_in_memory!(set_bit, 4),
+                    0xE6 => perform_in_memory!(set_bit, 4) + 8,
 
                     // set bit 5
                     0xEF => set_bit!(self.a, 5),
@@ -1148,7 +1151,7 @@ impl CPU {
                     0xEB => set_bit!(self.e, 5),
                     0xEC => set_bit!(self.h, 5),
                     0xED => set_bit!(self.l, 5),
-                    0xEE => perform_in_memory!(set_bit, 5),
+                    0xEE => perform_in_memory!(set_bit, 5) + 8,
 
                     // set bit 6
                     0xF7 => set_bit!(self.a, 6),
@@ -1158,7 +1161,7 @@ impl CPU {
                     0xF3 => set_bit!(self.e, 6),
                     0xF4 => set_bit!(self.h, 6),
                     0xF5 => set_bit!(self.l, 6),
-                    0xF6 => perform_in_memory!(set_bit, 6),
+                    0xF6 => perform_in_memory!(set_bit, 6) + 8,
 
                     // set bit 7
                     0xFF => set_bit!(self.a, 7),
@@ -1168,7 +1171,7 @@ impl CPU {
                     0xFB => set_bit!(self.e, 7),
                     0xFC => set_bit!(self.h, 7),
                     0xFD => set_bit!(self.l, 7),
-                    0xFE => perform_in_memory!(set_bit, 7),
+                    0xFE => perform_in_memory!(set_bit, 7) + 8,
                 }
             }
         }
@@ -1205,7 +1208,7 @@ impl CPU {
     fn restart(&mut self, offset: u16) -> u16 {
         self.push_stack(self.pc);
         self.pc = offset;
-        32
+        16
     }
 
     fn return_from_call(&mut self, flag: u8, use_condition: bool, condition: bool) -> u16 {
