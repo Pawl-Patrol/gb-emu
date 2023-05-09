@@ -72,7 +72,7 @@ impl MMU {
         let address = (data as u16) << 8;
         for i in 0..0xA0 {
             let value = self.read(address + i);
-            self.gpu.oam[i as usize] = value;
+            self.write(0xFE00 + i, value);
         }
     }
 
@@ -105,7 +105,10 @@ impl MMU {
             // IE
             0xFFFF => self.interrupt_enable,
             // backup
-            0xFF00..=0xFF7F => self.io_backup[(address - 0xFF00) as usize],
+            0xFF00..=0xFF7F => {
+                // println!("read: {:04X}", address);
+                self.io_backup[(address - 0xFF00) as usize]
+            }
         }
     }
 
@@ -138,10 +141,11 @@ impl MMU {
             0xFF0F => self.interrupt_flag = value,
             // serial
             0xFF01 => print!("{}", value as char), // print serial output
-            // interrupt flags
+            // IE
             0xFFFF => self.interrupt_enable = value,
             // backup
             0xFF00..=0xFF7F => {
+                // println!("write: {:04X} = {:02X}", address, value);
                 self.io_backup[(address - 0xFF00) as usize] = value;
             }
         }

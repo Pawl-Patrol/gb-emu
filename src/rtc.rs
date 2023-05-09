@@ -22,20 +22,10 @@ impl Cartridge for RTC {
 
     fn write(&mut self, address: usize, data: u8) {
         match address {
-            0xFF04 => {
-                self.divider_counter = 0;
-                self.timer_counter = 0;
-            }
+            0xFF04 => self.divider_counter = 0,
             0xFF05 => self.tima = data,
             0xFF06 => self.tma = data,
-            0xFF07 => {
-                let before = self.get_clock_frequency();
-                self.tac = data;
-                let after = self.get_clock_frequency();
-                if after != before {
-                    self.timer_counter = 0;
-                }
-            }
+            0xFF07 => self.tac = data,
             _ => panic!("Invalid RTC address"),
         }
     }
@@ -74,10 +64,10 @@ impl RTC {
 
     fn get_clock_frequency(&self) -> u32 {
         match self.tac & 0b0000_0011 {
-            0 => 1024,
-            1 => 16,
-            2 => 64,
-            3 => 256,
+            0b00 => 4096,
+            0b01 => 262144,
+            0b10 => 65536,
+            0b11 => 16384,
             _ => panic!("Invalid timer frequency"),
         }
     }

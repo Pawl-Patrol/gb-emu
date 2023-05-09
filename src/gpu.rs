@@ -28,14 +28,17 @@ impl Cartridge for GPU {
             0xFF41 => self.lcd_status,
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
-            0xFF44 => 0x90, //self.ly,
+            0xFF44 => self.ly,
             0xFF45 => self.ly_compare,
             0xFF47 => self.bg_palette,
             0xFF48 => self.obj_palette_1,
             0xFF49 => self.obj_palette_2,
             0xFF4A => self.window_y,
             0xFF4B => self.window_x,
-            _ => panic!("Invalid gpu address: 0x{:X}", address),
+            _ => {
+                // println!("Invalid gpu address: 0x{:X}", address);
+                0x00
+            }
         }
     }
 
@@ -54,7 +57,7 @@ impl Cartridge for GPU {
             0xFF49 => self.obj_palette_2 = value,
             0xFF4A => self.window_y = value,
             0xFF4B => self.window_x = value,
-            _ => panic!("Invalid gpu address: 0x{:X}", address),
+            _ => (), // println!("Invalid gpu address: 0x{:04X} = {:02X}", address, value),
         }
     }
 }
@@ -172,7 +175,7 @@ impl GPU {
     fn render_tiles(&mut self) {
         let using_window = self.lcd_control.test_bit(5) && (self.window_y <= self.ly);
         let unsigned = self.lcd_control.test_bit(4);
-        let tile_data: u16 = if unsigned { 0x8000 } else { 0x8800 };
+        let tile_data = if unsigned { 0x8000 } else { 0x8800 };
 
         let background_mem = if using_window {
             if self.lcd_control.test_bit(6) {

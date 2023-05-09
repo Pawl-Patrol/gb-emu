@@ -70,43 +70,51 @@ fn run_rom(path: &str, log: bool) {
             }
         }
 
-        let ticks = elapsed * 4194304 / 1000000;
+        if let Some(i) = cpu.mmu.joypad.needs_interrupt {
+            cpu.request_interrupt(i);
+            cpu.mmu.joypad.needs_interrupt = None;
+        }
+
+        let mut ticks = elapsed * 4194304 / 1000000;
+        if ticks > 69905 {
+            // println!("too slow: {}", ticks);
+            ticks = 69905;
+        }
         let mut cycles = 0;
-        while cycles < ticks {
-            // log A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
-            let str  = format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
-                cpu.a,
-                cpu.f,
-                cpu.b,
-                cpu.c,
-                cpu.d,
-                cpu.e,
-                cpu.h,
-                cpu.l,
-                cpu.sp,
-                cpu.pc,
-                cpu.mmu.read(cpu.pc),
-                cpu.mmu.read(cpu.pc + 1),
-                cpu.mmu.read(cpu.pc + 2),
-                cpu.mmu.read(cpu.pc + 3),
-            );
-            if let Some(f) = &mut file {
-                f.write_all(str.as_bytes()).unwrap();
-            }
-            if let Some(i) = cpu.mmu.joypad.needs_interrupt {
-                cpu.request_interrupt(i)
-            }
-            let c = cpu.execute_next_opcode();
-            cpu.mmu.rtc.update_timers(c);
+        while cycles < 69905 {
+            // // log A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
+            // if let Some(f) = &mut file {
+            //     let str  = format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
+            //     cpu.a,
+            //     cpu.f,
+            //     cpu.b,
+            //     cpu.c,
+            //     cpu.d,
+            //     cpu.e,
+            //     cpu.h,
+            //     cpu.l,
+            //     cpu.sp,
+            //     cpu.pc,
+            //     cpu.mmu.read(cpu.pc),
+            //     cpu.mmu.read(cpu.pc + 1),
+            //     cpu.mmu.read(cpu.pc + 2),
+            //     cpu.mmu.read(cpu.pc + 3),
+            // );
+            //     f.write_all(str.as_bytes()).unwrap();
+            // }
+            let op_cycles = cpu.execute_next_opcode();
+            cpu.mmu.rtc.update_timers(op_cycles);
             if let Some(i) = cpu.mmu.rtc.needs_interrupt {
-                cpu.request_interrupt(i)
+                cpu.request_interrupt(i);
+                cpu.mmu.rtc.needs_interrupt = None;
             }
-            cpu.mmu.gpu.update_graphics(c);
+            cpu.mmu.gpu.update_graphics(op_cycles);
             if let Some(i) = cpu.mmu.gpu.needs_interrupt {
-                cpu.request_interrupt(i)
+                cpu.request_interrupt(i);
+                cpu.mmu.gpu.needs_interrupt = None;
             }
             cpu.do_interrupts();
-            cycles += c as u128;
+            cycles += op_cycles as u128;
         }
 
         window
@@ -120,5 +128,23 @@ fn run_rom(path: &str, log: bool) {
 }
 
 fn main() {
-    run_rom("./roms/instr_timing.gb", true);
+    // run_rom("./roms/01-special.gb", true);
+    // run_rom("./roms/02-interrupts.gb", true);
+    // run_rom("./roms/03-op sp,hl.gb", true);
+    // run_rom("./roms/04-op r,imm.gb", true);
+    // run_rom("./roms/05-op rp.gb", true);
+    // run_rom("./roms/06-ld r,r.gb", true);
+    // run_rom("./roms/07-jr,jp,call,ret,rst.gb", true);
+    // run_rom("./roms/08-misc instrs.gb", true);
+    // run_rom("./roms/09-op r,r.gb", true);
+    // run_rom("./roms/10-bit ops.gb", true);
+    // run_rom("./roms/11-op a,(hl).gb", true);
+    // run_rom("./roms/tetris.gb", true);
+    // run_rom(
+    //     "./tests/mooneye-test-suite/acceptance/add_sp_e_timing.gb",
+    //     false,
+    // );
+    // run_rom("./tests/age-test-roms/halt/ei-halt-dmgC-cgbBCE.gb", false);
+    // run_rom("./tests/bully/bully.gb", true);
+    run_rom("./roms/pikachu.gb", false);
 }

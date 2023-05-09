@@ -80,7 +80,7 @@ impl CPU {
     pub fn do_interrupts(&mut self) {
         if self.interrupt_master_enable {
             for i in 0..5 {
-                if self.mmu.interrupt_enable.test_bit(i) && self.mmu.interrupt_flag.test_bit(i) {
+                if self.mmu.interrupt_flag.test_bit(i) && self.mmu.interrupt_enable.test_bit(i) {
                     self.service_interrupt(i);
                 }
             }
