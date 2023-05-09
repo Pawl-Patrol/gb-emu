@@ -1,8 +1,9 @@
-use crate::{
-    constants::{FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO},
-    mmu::MMU,
-    traits::{CarryTest, Register, SetBit, TestBit, ToggleBit},
-};
+use crate::{mmu::MMU, traits::*};
+
+pub const FLAG_ZERO: u8 = 7;
+pub const FLAG_SUBTRACT: u8 = 6;
+pub const FLAG_HALF_CARRY: u8 = 5;
+pub const FLAG_CARRY: u8 = 4;
 
 pub struct CPU {
     // 8-bit registers
@@ -57,7 +58,15 @@ impl CPU {
         }
     }
 
-    pub fn execute_next_opcode(&mut self) -> u16 {
+    pub fn update(&mut self) -> u16 {
+        let op_cycles = self.execute_next_opcode();
+        self.mmu.interrupt_flag |= self.mmu.rtc.update_timers(op_cycles);
+        self.mmu.interrupt_flag |= self.mmu.gpu.update_graphics(op_cycles);
+        self.do_interrupts();
+        op_cycles
+    }
+
+    fn execute_next_opcode(&mut self) -> u16 {
         let cycles = if self.halted {
             4
         } else {
@@ -102,10 +111,6 @@ impl CPU {
             4 => self.pc = 0x60,
             _ => panic!("Invalid interrupt id"),
         }
-    }
-
-    pub fn request_interrupt(&mut self, id: u8) {
-        self.mmu.interrupt_flag.set_bit(id);
     }
 
     fn af(&self) -> u16 {

@@ -1,9 +1,17 @@
-use crate::traits::{Cartridge, SetBit, TestBit};
+use crate::traits::*;
+
+pub const KEY_UP: u8 = 2;
+pub const KEY_DOWN: u8 = 3;
+pub const KEY_LEFT: u8 = 1;
+pub const KEY_RIGHT: u8 = 0;
+pub const KEY_A: u8 = 4;
+pub const KEY_B: u8 = 5;
+pub const KEY_START: u8 = 7;
+pub const KEY_SELECT: u8 = 6;
 
 pub struct JoyPad {
     pub joypad_state: u8,
     pub input: u8,
-    pub needs_interrupt: Option<u8>,
 }
 
 impl Cartridge for JoyPad {
@@ -27,19 +35,21 @@ impl JoyPad {
         JoyPad {
             joypad_state: 0xCF,
             input: 0x00,
-            needs_interrupt: None,
         }
     }
 
-    pub fn on_key_pressed(&mut self, key: u8) {
+    pub fn on_key_pressed(&mut self, key: u8) -> u8 {
+        let mut interrupt_flag = 0;
         let previously_set = self.joypad_state.test_bit(key);
         self.joypad_state.reset_bit(key);
         let button = if key > 3 { true } else { false };
         if ((button && !self.input.test_bit(5)) || (!button && !self.input.test_bit(4)))
             && !previously_set
         {
-            self.needs_interrupt = Some(4);
+            interrupt_flag |= 1 << 4;
         }
+
+        interrupt_flag
     }
 
     pub fn on_key_released(&mut self, key: u8) {

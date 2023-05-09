@@ -1,4 +1,4 @@
-use crate::traits::{Cartridge, Register, TestBit};
+use crate::traits::*;
 
 pub struct RTC {
     pub timer_counter: u32,
@@ -43,7 +43,9 @@ impl RTC {
         }
     }
 
-    pub fn update_timers(&mut self, cycles: u16) {
+    pub fn update_timers(&mut self, cycles: u16) -> u8 {
+        let mut interrupt_flag = 0;
+
         self.divider_counter = self.divider_counter.wrapping_add(cycles);
         if self.clock_enabled() {
             let threshold = self.get_clock_frequency();
@@ -56,10 +58,12 @@ impl RTC {
                 };
                 self.tima = new_tima;
                 if overflow {
-                    self.needs_interrupt = Some(2);
+                    interrupt_flag |= 1 << 2;
                 }
             }
         }
+
+        interrupt_flag
     }
 
     fn get_clock_frequency(&self) -> u32 {

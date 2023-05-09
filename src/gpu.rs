@@ -1,11 +1,26 @@
-use crate::{canvas::*, constants::*, traits::*};
+use crate::traits::*;
+
+macro_rules! rgb {
+    ($r:expr, $g:expr, $b:expr) => {
+        ($r << 16) | ($g << 8) | $b
+    };
+}
+
+pub const COLOR_WHITE: u32 = rgb!(0xFF, 0xFF, 0xFF);
+pub const COLOR_LIGHT_GRAY: u32 = rgb!(0xCC, 0xCC, 0xCC);
+pub const COLOR_DARK_GRAY: u32 = rgb!(0x77, 0x77, 0x77);
+pub const COLOR_BLACK: u32 = rgb!(0x00, 0x00, 0x00);
+
+pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_HEIGHT: usize = 144;
+
+pub const SCANLINE_CYCLES: u16 = 456;
 
 pub struct GPU {
     pub vram: [u8; 0x2000], // video ram
     pub oam: [u8; 0xA0],    // object attribute memory
     pub video_buffer: Vec<u32>,
     pub scanline_counter: u16,
-    pub needs_interrupt: Option<u8>,
     pub lcd_control: u8,
     pub lcd_status: u8,
     pub scroll_y: u8,
@@ -69,7 +84,6 @@ impl GPU {
             oam: [0; 0xA0],
             video_buffer: vec![0; SCREEN_WIDTH * SCREEN_HEIGHT],
             scanline_counter: 0,
-            needs_interrupt: None,
             lcd_control: 0x91,
             lcd_status: 0x85,
             scroll_y: 0x00,
@@ -83,11 +97,11 @@ impl GPU {
             window_x: 0x00,
         }
     }
-    pub fn update_graphics(&mut self, cycles: u16) {
-        self.set_lcd_status();
+    pub fn update_graphics(&mut self, cycles: u16) -> u8 {
+        let mut needs_interrupt = self.set_lcd_status();
 
         if !self.lcd_enabled() {
-            return;
+            return 0;
         }
 
         if let Some(new_scanline_counter) = self.scanline_counter.checked_sub(cycles) {
@@ -97,22 +111,24 @@ impl GPU {
             self.ly += 1;
 
             if self.ly == 144 {
-                self.needs_interrupt = Some(0);
+                needs_interrupt |= 1;
             } else if self.ly > 153 {
                 self.ly = 0;
             } else if self.ly < 144 {
                 self.draw_scanline();
             }
         }
+
+        needs_interrupt
     }
 
-    fn set_lcd_status(&mut self) {
+    fn set_lcd_status(&mut self) -> u8 {
         if !self.lcd_enabled() {
             self.scanline_counter = SCANLINE_CYCLES;
             self.ly = 0;
             self.lcd_status &= 0b1111_1100;
             self.lcd_status.set_bit(0);
-            return;
+            return 0;
         }
 
         let current_mode = self.lcd_status & 0b0000_0011;
@@ -145,18 +161,22 @@ impl GPU {
             }
         }
 
+        let mut interrupt_flag = 0;
+
         if request_interrupt && (mode != current_mode) {
-            self.needs_interrupt = Some(1);
+            interrupt_flag |= 1 << 1;
         }
 
         if self.ly == self.ly_compare {
             self.lcd_status.set_bit(2);
             if self.lcd_status.test_bit(6) {
-                self.needs_interrupt = Some(1);
+                interrupt_flag |= 1 << 1;
             }
         } else {
             self.lcd_status.reset_bit(2);
         }
+
+        interrupt_flag
     }
 
     fn lcd_enabled(&self) -> bool {
