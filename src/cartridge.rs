@@ -1,5 +1,7 @@
 use std::io::{Read, Result, Seek};
 
+use crate::traits::TestBit;
+
 const REGISTER_CARTRIDGE_TYPE: usize = 0x0147;
 const REGISTER_ROM_SIZE: usize = 0x0148;
 const REGISTER_RAM_SIZE: usize = 0x0149;
@@ -15,6 +17,7 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
     match buffer[0] {
         0x00 | 0x08 | 0x09 => Ok(Box::new(NoMBC::load(path))),
         0x01 | 0x02 | 0x03 => Ok(Box::new(MBC1::load(path))),
+        0x05 | 0x06 => Ok(Box::new(MBC2::load(path))),
         _ => panic!("Unsupported cartridge type!"),
     }
 }
@@ -58,13 +61,10 @@ struct NoMBC {
 impl NoMBC {
     fn load(path: &str) -> Self {
         let rom: Vec<u8> = std::fs::read(path).unwrap();
-
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
-
         let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
         let ram = vec![0; ram_size];
-
         NoMBC { rom, ram }
     }
 }
@@ -81,7 +81,7 @@ impl Cartridge for NoMBC {
     fn write(&mut self, address: usize, data: u8) {
         match address {
             0xA000..=0xBFFF => self.ram[address - 0xA000] = data,
-            _ => {} // ignore any other writes
+            _ => {}
         }
     }
 }
@@ -99,13 +99,10 @@ struct MBC1 {
 impl MBC1 {
     fn load(path: &str) -> Self {
         let rom: Vec<u8> = std::fs::read(path).unwrap();
-
         let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
         assert!(rom.len() == rom_size);
-
         let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
         let ram = vec![0; ram_size];
-
         MBC1 {
             rom,
             ram,
@@ -155,7 +152,144 @@ impl Cartridge for MBC1 {
                     self.ram[bank + address - 0xA000] = data;
                 }
             }
-            _ => {} // ignore any other writes
+            _ => {}
+        }
+    }
+}
+
+struct MBC2 {
+    rom: Vec<u8>,
+    ram: [u8; 256],
+    // registers
+    ram_enabled: bool,
+    rom_bank: usize,
+}
+
+impl MBC2 {
+    fn load(path: &str) -> Self {
+        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
+        assert!(rom.len() == rom_size);
+        MBC2 {
+            rom,
+            ram: [0; 256],
+            ram_enabled: false,
+            rom_bank: 1,
+        }
+    }
+}
+
+impl Cartridge for MBC2 {
+    fn read(&self, address: usize) -> u8 {
+        match address {
+            0x0000..=0x3FFF => self.rom[address],
+            0x4000..=0x7FFF => {
+                let bank = self.rom_bank * ROM_BANK_SIZE;
+                self.rom[bank + address - 0x4000]
+            }
+            0xA000..=0xA1FF => self.ram[address - 0xA000],
+            0xA200..=0xBFFF => self.ram[address - 0xA200], // echo ram
+            _ => panic!("Invalid address read!"),
+        }
+    }
+
+    fn write(&mut self, address: usize, data: u8) {
+        match address {
+            0x0000..=0x3FFF => {
+                if data.test_bit(7) {
+                    let data = if data == 0 { 1 } else { data };
+                    self.rom_bank = data as usize & 0b0000_1111;
+                } else {
+                    self.ram_enabled = data & 0x0F == 0x0A;
+                }
+            }
+            0xA000..=0xA1FF => {
+                if self.ram_enabled {
+                    self.ram[address - 0xA000] = data & 0x0F;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+struct MBC3 {
+    rom: Vec<u8>,
+    ram: Vec<u8>,
+    // registers
+    ram_and_timer_enabled: bool,
+    ram_banking_mode: bool,
+    ram_bank: usize,
+    rom_bank: usize,
+    rtc_select: usize,
+    rtc: [u8; 5],
+}
+
+impl MBC3 {
+    fn load(path: &str) -> Self {
+        let rom: Vec<u8> = std::fs::read(path).unwrap();
+        let rom_size = get_rom_size(rom[REGISTER_ROM_SIZE]);
+        assert!(rom.len() == rom_size);
+        let ram_size = get_ram_size(rom[REGISTER_RAM_SIZE]);
+        let ram = vec![0; ram_size];
+        MBC3 {
+            rom,
+            ram,
+            ram_and_timer_enabled: false,
+            ram_banking_mode: false,
+            ram_bank: 0,
+            rom_bank: 1,
+            rtc_select: 0,
+            rtc: [0; 5],
+        }
+    }
+}
+
+impl Cartridge for MBC3 {
+    fn read(&self, address: usize) -> u8 {
+        match address {
+            0x0000..=0x3FFF => self.rom[address],
+            0x4000..=0x7FFF => {
+                let bank = self.rom_bank * ROM_BANK_SIZE;
+                self.rom[bank + address - 0x4000]
+            }
+            0xA000..=0xBFFF => {
+                if self.ram_banking_mode {
+                    let bank = self.ram_bank * RAM_BANK_SIZE;
+                    self.ram[bank + address - 0xA000]
+                } else {
+                    match self.rtc_select {
+                        0x08 => self.rtc[0],
+                        0x09 => self.rtc[1],
+                        0x0A => self.rtc[2],
+                        0x0B => self.rtc[3],
+                        0x0C => self.rtc[4],
+                        _ => panic!("Invalid RTC select!"),
+                    }
+                }
+            }
+            _ => panic!("Invalid address read!"),
+        }
+    }
+
+    fn write(&mut self, address: usize, data: u8) {
+        match address {
+            0x0000..=0x1FFF => self.ram_and_timer_enabled = data & 0x0F == 0x0A,
+            0x2000..=0x3FFF => {
+                let data = if data == 0 { 1 } else { data };
+                self.rom_bank = data as usize & 0b0111_1111;
+            }
+            0x4000..=0x5FFF => {
+                if data <= 0x03 {
+                    self.ram_banking_mode = true;
+                    self.ram_bank = data as usize;
+                } else if data >= 0x08 && data <= 0x0C {
+                    self.ram_banking_mode = false;
+                    self.rtc_select = data as usize;
+                }
+            }
+            0x6000..=0x7FFF => {} // Todo: Latch RTC
+            _ => {}
         }
     }
 }
