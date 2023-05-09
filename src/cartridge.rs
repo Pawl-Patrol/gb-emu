@@ -446,11 +446,17 @@ impl Memory for MBC5 {
 }
 
 impl Cartridge for MBC5 {
-    fn deserialize(&mut self, data: Vec<u8>) {
-        self.ram = data;
+    fn serialize(&self) -> Vec<u8> {
+        let mut data = self.ram.clone();
+        data.push(self.enable_ram as u8);
+        data.push(self.ram_bank as u8);
+        data
     }
 
-    fn serialize(&self) -> Vec<u8> {
-        self.ram.clone()
+    fn deserialize(&mut self, data: Vec<u8>) {
+        let len = data.len();
+        self.enable_ram = data[len - 1] != 0;
+        self.ram_bank = data[len - 2] as usize;
+        self.ram = data[..len - 2].to_vec();
     }
 }
